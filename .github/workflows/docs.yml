@@ -49,3 +49,7 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # Larger artifact (interactive 3D HTML ~90 MB) needs longer than the
+          # 10-min default for Pages to publish, otherwise "Timeout reached".
+          timeout: 1800000
