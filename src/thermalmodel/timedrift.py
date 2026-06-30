@@ -104,13 +104,13 @@ def run_time_resolved(cfg, res, bl, vw, session=None):
     hh = "/".join(f"{h:02d}" for h in cfg.cumulative_hours_drift)
     if any(by_hot.values()):
         build_plume_3d_timeslider(grid, mask, dtm, by_hot, out / "d1_plumes_hotspots_3d.html",
-                                  f"D1 Plumes — unsere Hotspots, zeitaufgelöst {hh} h ({cfg.date})")
+                                  f"D1 plumes — our hotspots, time-resolved {hh} h ({cfg.date})")
     if any(by_grid.values()):
         build_plume_3d_timeslider(grid, mask, dtm, by_grid, out / "d1_plumes_grid_3d.html",
-                                  f"D1 Plumes — {cfg.plume3d_grid_spacing_m:.0f} m-Netz, zeitaufgelöst {hh} h ({cfg.date})")
+                                  f"D1 plumes — {cfg.plume3d_grid_spacing_m:.0f} m grid, time-resolved {hh} h ({cfg.date})")
     if any(by_kk7.values()):
         build_plume_3d_timeslider(grid, mask, dtm, by_kk7, out / "d1_plumes_kk7_3d.html",
-                                  f"D1 Plumes — kk7-Heatmap-Quellen, zeitaufgelöst {hh} h ({cfg.date})")
+                                  f"D1 plumes — kk7 heatmap sources, time-resolved {hh} h ({cfg.date})")
     log.info("D1-Plumes zeitaufgelöst (Slider %s h): Hotspots/kk7/Netz als 3 HTML geschrieben", hh)
 
     # XC-Flugpotenzial (soaringmeteo-Adoption) zur Mittagszeit

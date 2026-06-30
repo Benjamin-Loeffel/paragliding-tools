@@ -25,9 +25,12 @@ python meteo/radiosonde_payerne.py latest
 - `terrainclearance/` — `…_3d.png` (3D relief + flight track by terrain clearance), `…_map.html` (interactive
   map), `aggregate_clearance_kde.png` (flight comparison: time-in-terrain-clearance), `risk_over_time.png`,
   `…_events.csv`, `…_run.json`. Generated with `--png` (static PNGs via kaleido).
-- `thermalmodel/` — `qh_ideal_daymax.png` (ideal sensible-heat-flux (Q_H) map), `day_timeline.png` ("when to launch?"),
-  `drift_15h_grid.png` (wind drift of the thermals at 15 h), `hotspots.html` (interactive), `hotspots.csv`.
+- `thermalmodel/` — the step-by-step narrative figures (see [`src/thermalmodel/README.md`](../src/thermalmodel/README.md)):
+  `relief.png`, `aspect_slope.png`, `landcover_3d.png`, `qh_ideal_daymax.png`, `qh_real_daymax.png` +
+  `qh_diff_energy.png` (ideal→real), `wind_traces_13h.png`, `drift_15h_grid.png`, `d1_plumes_grid_3d.png`
+  (drifting plumes ≈15 h); plus `day_timeline.png` ("when to launch?") and the interactive
+  `hotspots.html` and `d1_plumes_hotspots_3d.html` (time-of-day slider). `hotspots.csv`.
 
-> The interactive HTML files are self-contained — open them locally in the browser. Large 3D plots
-> (`…_3d.html`, plume slider) are intentionally **not** checked in; they are produced during your own run.
-> kk7-derived images are intentionally absent (CC BY-NC-SA; see ATTRIBUTION.md).
+> The interactive HTML files are self-contained — open them locally in the browser. Only the (smaller)
+> hotspots plume slider is checked in; the grid/kk7 plume variants and the other 3D HTML are produced
+> during your own run. kk7-derived images are intentionally absent (CC BY-NC-SA; see ATTRIBUTION.md).

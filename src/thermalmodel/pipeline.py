@@ -21,7 +21,8 @@ from .buoyancy import thermal_source_field
 from .landcover import classify
 from .nwp import fetch_cloud_attenuation
 from .report import (build_cumulative_energy_3d_files, build_energy_3d, plot_attenuation_timeseries,
-                     plot_cumulative_panels_png, plot_field_png, plot_hotspot_map_html, write_geotiffs)
+                     plot_cumulative_panels_png, plot_field_png, plot_hotspot_map_html,
+                     plot_relief_png, plot_aspect_slope_png, plot_landcover_3d, write_geotiffs)
 from .reproject import lv95_to_wgs84
 from .terrain_derivs import load_terrain
 
@@ -66,6 +67,13 @@ def run_phase_a(cfg: ThermalConfig) -> dict:
 
     out = Path(cfg.output_dir)
     write_geotiffs(grid, mask, terrain, heat, score, out, "ideal")
+    # Schritt-für-Schritt-Herleitung (für die README-Narrative): Relief → Exposition/Steilheit → Wald aufs Relief
+    plot_relief_png(grid, mask, terrain.dtm, out / "relief.png",
+                    "Elevation model (swissALTI3D) — Niesen/Frutigen")
+    plot_aspect_slope_png(grid, mask, terrain, out / "aspect_slope.png",
+                          "Exposure (aspect) & steepness (slope), derived from the relief")
+    plot_landcover_3d(grid, mask, terrain.dtm, lc, out / "landcover_3d.html",
+                      f"Forest cover type on the relief — {cfg.date}")
     png = plot_field_png(grid, mask, terrain.dtm, heat.Q_H_daymax, hotspots,
                          f"Ideal Q_H heat-flux map (daily max) — {cfg.date}", out / "qh_ideal_daymax.png")
     html = plot_hotspot_map_html(hotspots, cfg, out / "hotspots.html")
@@ -75,8 +83,8 @@ def run_phase_a(cfg: ThermalConfig) -> dict:
     # D0: Thermik-Quell-Wahrscheinlichkeit (validiertes Proxy) als GeoTIFF + 3D
     grid.to_geotiff(np.where(mask, d0.prob, np.nan), out / "d0_thermal_source.tif")
     build_energy_3d(grid, mask, terrain.dtm, d0.prob, hotspots, out / "d0_thermal_source_3d.html",
-                    f"D0 Thermik-Quell-Wahrscheinlichkeit — {cfg.date}",
-                    colorbar="Quell-Wahrsch. [0..1]", cmin=0.0, cmax=1.0, colorscale="Viridis")
+                    f"D0 thermal-source probability — {cfg.date}",
+                    colorbar="Source prob. [0..1]", cmin=0.0, cmax=1.0, colorscale="Viridis")
 
     # Kumulierter Energieeintrag zu mehreren Tageszeiten
     cum = cumulative_energy_at(heat, cfg.cumulative_hours)

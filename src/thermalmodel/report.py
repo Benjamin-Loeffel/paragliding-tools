@@ -44,6 +44,92 @@ def plot_field_png(grid: Grid, mask, dtm, field, hotspots, title, path, cmap="in
     return path
 
 
+def plot_relief_png(grid: Grid, mask, dtm, path, title):
+    """Schritt 1 der Herleitung: das nackte Höhenmodell (Hillshade + Höhen-Tönung)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    z = np.where(mask, dtm, np.nan)
+    fig, ax = plt.subplots(figsize=(9, 11))
+    extent = draw_hillshade(ax, dtm, grid)
+    im = ax.imshow(z, cmap="viridis", extent=extent, origin="upper", alpha=0.55, interpolation="nearest")
+    ax.set_title(title); ax.set_xlabel("LV95 East [m]"); ax.set_ylabel("LV95 North [m]")
+    fig.colorbar(im, ax=ax, shrink=0.6, label="Elevation [m a.s.l.]")
+    ax.set_aspect("equal")
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=170, bbox_inches="tight"); plt.close(fig)
+    return path
+
+
+def plot_aspect_slope_png(grid: Grid, mask, terrain, path, title):
+    """Schritt 2: aus dem Relief abgeleitete Exposition (Aspekt, zyklisch) + Steilheit (Slope)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    slope_deg = np.where(mask, np.degrees(terrain.slope), np.nan)
+    aspect_deg = np.where(mask, np.degrees(terrain.aspect), np.nan)
+    fig, axes = plt.subplots(1, 2, figsize=(15, 7.5))
+    # Steilheit — sequenziell (viridis)
+    ext = draw_hillshade(axes[0], terrain.dtm, grid)
+    s = axes[0].imshow(slope_deg, cmap="viridis", extent=ext, origin="upper", alpha=0.8,
+                       vmin=0, vmax=55, interpolation="nearest")
+    axes[0].set_title("Steepness (slope)"); axes[0].set_aspect("equal")
+    axes[0].set_xlabel("LV95 East [m]"); axes[0].set_ylabel("LV95 North [m]")
+    fig.colorbar(s, ax=axes[0], shrink=0.6, label="Slope [°]")
+    # Exposition — Aspekt ist ZYKLISCH → zyklische Map (twilight), bewusste Ausnahme zur viridis-Politik
+    ext = draw_hillshade(axes[1], terrain.dtm, grid)
+    a = axes[1].imshow(aspect_deg, cmap="twilight", extent=ext, origin="upper", alpha=0.85,
+                       vmin=0, vmax=360, interpolation="nearest")
+    axes[1].set_title("Exposure (aspect)"); axes[1].set_aspect("equal")
+    axes[1].set_xlabel("LV95 East [m]")
+    cb = fig.colorbar(a, ax=axes[1], shrink=0.6, label="Aspect [° from N, clockwise]")
+    cb.set_ticks([0, 90, 180, 270, 360]); cb.set_ticklabels(["N", "E", "S", "W", "N"])
+    fig.suptitle(title, fontsize=15)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=160, bbox_inches="tight"); plt.close(fig)
+    return path
+
+
+def plot_landcover_3d(grid: Grid, mask, dtm, lc, path, title):
+    """Schritt 3: Waldbedeckungsart (Nadel/Laub/Misch/offen …) auf das Relief drapiert (3D)."""
+    import plotly.graph_objects as go
+    from . import config as C
+
+    codes = [C.LC_UNKNOWN, C.LC_CONIFER, C.LC_BROADLEAF, C.LC_MIXED, C.LC_GRASS,
+             C.LC_ROCK, C.LC_WATER, C.LC_SNOW, C.LC_URBAN]
+    names = ["unknown", "conifer", "broadleaf", "mixed", "grass",
+             "rock/scree", "water", "snow/ice", "urban"]
+    colors = ["#999999", "#1b7837", "#a6dba0", "#5aae61", "#d9ef8b",
+              "#bdbdbd", "#4393c3", "#f7f7f7", "#b2182b"]
+    nb = len(codes)
+    cs = []
+    for i, c in enumerate(colors):
+        cs += [[i / nb, c], [(i + 1) / nb, c]]          # diskrete (gestufte) Colorscale
+
+    z = np.where(mask, dtm, np.nan).astype(float)
+    col = np.where(mask, lc.class_id, np.nan).astype(float)
+    w, s, e, n = grid.bounds()
+    xs = (np.arange(grid.nx) + 0.5) * grid.res
+    ys = (grid.ny - np.arange(grid.ny) - 0.5) * grid.res
+    fig = go.Figure(go.Surface(
+        x=xs, y=ys, z=z, surfacecolor=col, colorscale=cs, cmin=-0.5, cmax=nb - 0.5,
+        colorbar=dict(title="Land cover", tickmode="array",
+                      tickvals=codes, ticktext=names),
+        lighting=dict(ambient=0.7, diffuse=0.55), hoverinfo="skip"))
+    fig.update_layout(title=title, margin=dict(l=0, r=0, t=40, b=0),
+                      scene=dict(xaxis_title="East [m]", yaxis_title="North [m]",
+                                 zaxis_title="Altitude [m a.s.l.]", aspectmode="data"))
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.write_html(str(path), include_plotlyjs=True)
+    try:                                                # statisches PNG fürs README (kaleido)
+        fig.write_image(str(Path(path).with_suffix(".png")), width=1500, height=1000, scale=2)
+    except Exception:
+        pass
+    return fig
+
+
 def build_energy_3d(grid: Grid, mask, dtm, energy, hotspots, path, title,
                     colorbar="Energy input [Wh/m²]", cmin=None, cmax=None, colorscale="Inferno"):
     """Plotly-3D-Relief (volle Gitterauflösung), Boden nach Feldwert eingefärbt (Sequential-Map)."""

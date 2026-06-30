@@ -7,6 +7,53 @@ drifting thermal columns — validated against the author's own IGC climbs and t
 Sister package to `terrainclearance` (terrain clearance) and `meteo` (Payerne sounding) and reuses
 both. **Decisions + rationale + assumptions:** see [`docs/thermalmodel-journal.md`](../../docs/thermalmodel-journal.md) (ADRs).
 
+## How the model reasons (step by step)
+
+A solar thermal forecast is built up from the terrain — each step adds one physical ingredient.
+The figures are produced by `python thermal.py` on the example domain (Niesen/Frutigen).
+
+**1 · Elevation model.** The swissALTI3D relief is the foundation: it decides where slopes face the
+sun and where ridges/gullies organise the rising air.
+
+![Elevation model](../../examples/output/thermalmodel/relief.png)
+
+**2 · Exposure & steepness.** From the relief we derive *aspect* (which way a slope faces) and *slope*
+(how steep). Moderately steep, sun-facing slopes receive the most energy. Aspect is cyclic, hence the
+twilight colour wheel (N→E→S→W→N).
+
+![Aspect and slope](../../examples/output/thermalmodel/aspect_slope.png)
+
+**3 · Land cover on the relief.** Conifer forest, alpine meadow and bare rock turn sunlight into
+sensible heat very differently (albedo + heat fraction `f_H`). This bridges pure geometry to the real
+surface.
+
+![Land cover on the relief](../../examples/output/thermalmodel/landcover_3d.png)
+
+**4 · Ideal heat input.** Clear-sky irradiance × surface → sensible heat flux `Q_H`, the thermal
+driver, for a hypothetical cloud-free day. Hotspots (cyan) mark where the most energy goes in.
+
+![Ideal Q_H heat-flux map](../../examples/output/thermalmodel/qh_ideal_daymax.png)
+
+**5 · Real heat input = clouds + vegetation.** ICON-CH cloud attenuation and the land-cover
+albedo/`f_H` turn the *ideal* field into the *real* one; the difference is the cloud loss.
+
+| real Q_H (with ICON clouds) | cloud loss (ideal − real) |
+|---|---|
+| ![Real Q_H](../../examples/output/thermalmodel/qh_real_daymax.png) | ![Cloud loss](../../examples/output/thermalmodel/qh_diff_energy.png) |
+
+**6 · Wind + thermals → drifting plumes.** The ICON wind field (several heights) plus the buoyancy
+(`w*`/`z_i`) advect the rising columns — thermals don't go straight up, they drift and shear with height.
+
+![ICON wind traces](../../examples/output/thermalmodel/wind_traces_13h.png)
+
+| thermal drift field 15:00 | drifting plumes over the relief (≈15:00) |
+|---|---|
+| ![Drift field 15:00](../../examples/output/thermalmodel/drift_15h_grid.png) | ![Drifting plumes](../../examples/output/thermalmodel/d1_plumes_grid_3d.png) |
+
+→ interactive, time-resolved 3D (slider 11/13/15/18 h): [`d1_plumes_hotspots_3d.html`](../../examples/output/thermalmodel/d1_plumes_hotspots_3d.html).
+
+The remainder of this README is the formal pipeline, data sources and findings.
+
 ## Running
 
 ```bash

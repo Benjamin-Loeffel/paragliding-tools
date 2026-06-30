@@ -302,18 +302,23 @@ def build_plume_3d_timeslider(grid, mask, dtm, tracks_by_hour, path, title):
                                       cmin=cmin, cmax=cmax, colorbar=dict(title="Altitude [m]"), showscale=True))
 
     frames = [go.Frame(data=[trace(tracks_by_hour[h])], name=f"{h:02d}", traces=[1]) for h in hours]
-    fig = go.Figure(data=[surface, trace(tracks_by_hour[hours[0]])], frames=frames)
+    init = min(range(len(hours)), key=lambda i: abs(hours[i] - 15))   # bei ~15 h (Drift-Maximum) starten
+    fig = go.Figure(data=[surface, trace(tracks_by_hour[hours[init]])], frames=frames)
     steps = [dict(method="animate", label=f"{h:02d}:00",
                   args=[[f"{h:02d}"], dict(mode="immediate", frame=dict(duration=0, redraw=True),
                                            transition=dict(duration=0))]) for h in hours]
     fig.update_layout(title=title, margin=dict(l=0, r=0, t=40, b=0),
-                      sliders=[dict(active=0, currentvalue=dict(prefix="Time "), pad=dict(t=40),
+                      sliders=[dict(active=init, currentvalue=dict(prefix="Time "), pad=dict(t=40),
                                     steps=steps)],
                       scene=dict(xaxis_title="East [m]", yaxis_title="North [m]",
                                  zaxis_title="Altitude [m]", aspectmode="data"))
     from pathlib import Path
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(str(path), include_plotlyjs=True)
+    try:                                            # statisches PNG (Initialframe ~15 h) fürs README (kaleido)
+        fig.write_image(str(Path(path).with_suffix(".png")), width=1500, height=1000, scale=2)
+    except Exception:
+        pass
     return fig
 
 

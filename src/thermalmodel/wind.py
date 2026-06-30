@@ -180,8 +180,8 @@ def plot_wind_traces(grid, mask, dtm, gw: GriddedWind, z_amsl, path, title, dens
     U, V = gw.field_at_height(z_amsl)
     fig, ax = plt.subplots(figsize=(10, 12))
     strm, _ = _stream_on_ax(ax, grid, dtm, U, V, density)
-    fig.colorbar(strm.lines, ax=ax, shrink=0.6, label="Windgeschwindigkeit [km/h]")
-    ax.set_title(title); ax.set_xlabel("LV95 Ost [m]"); ax.set_ylabel("LV95 Nord [m]")
+    fig.colorbar(strm.lines, ax=ax, shrink=0.6, label="Wind speed [km/h]")
+    ax.set_title(title); ax.set_xlabel("LV95 East [m]"); ax.set_ylabel("LV95 North [m]")
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=dpi, bbox_inches="tight"); plt.close(fig)
     return path
@@ -202,7 +202,7 @@ def plot_wind_traces_levels(grid, mask, dtm, gw: GriddedWind, path, title, dpi=1
         strm, _ = _stream_on_ax(ax, grid, dtm, U, V, density=1.7, vmax_kmh=vmax)
         ax.set_title(lbl, fontsize=13); ax.set_xticks([]); ax.set_yticks([])
     if strm is not None:
-        fig.colorbar(strm.lines, ax=axes, shrink=0.85, label="Windgeschwindigkeit [km/h]")
+        fig.colorbar(strm.lines, ax=axes, shrink=0.85, label="Wind speed [km/h]")
     fig.suptitle(title, fontsize=15)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=dpi, bbox_inches="tight"); plt.close(fig)
