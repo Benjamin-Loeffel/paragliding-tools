@@ -79,6 +79,13 @@ Alle HTML-Dateien sind **eigenständig** (Plotly inline) und können offline ge�
 
 ---
 
+## Interaktives Beispiel
+
+Eine der self-contained Ausgaben — die Flugspur nach 3D-Hangabstand eingefärbt
+(Hover für Werte, kritische Stellen markiert); schwenken & zoomen:
+
+<iframe src="../../assets/terrainclearance/2026-06-25_66km_map.html" title="Interaktive Hangabstand-Karte" width="100%" height="560" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+
 ## Pipeline
 
 ```mermaid

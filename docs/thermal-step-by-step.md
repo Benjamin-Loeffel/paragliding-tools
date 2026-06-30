@@ -50,7 +50,9 @@ albedo/`f_H` turn the *ideal* field into the *real* one; the difference is the c
 |---|---|
 | ![Drift field 15:00](assets/thermalmodel/drift_15h_grid.png) | ![Drifting plumes](assets/thermalmodel/d1_plumes_grid_3d.png) |
 
-→ interactive, time-resolved 3D (slider 11/13/15/18 h): [`d1_plumes_hotspots_3d.html`](assets/thermalmodel/d1_plumes_hotspots_3d.html).
+→ interactive, time-resolved 3D (slider 11/13/15/18 h), embedded here:
+
+<iframe src="../assets/thermalmodel/d1_plumes_hotspots_3d.html" title="Drifting thermal plumes (time slider)" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
 
 The remainder of this README is the formal pipeline, data sources and findings.
 

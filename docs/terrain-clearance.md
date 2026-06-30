@@ -78,6 +78,13 @@ All HTML files are **self-contained** (plotly inline) and can be opened offline.
 
 ---
 
+## Interactive example
+
+One of the self-contained outputs — the flight track coloured by 3D terrain clearance
+(hover for values, critical points marked); pan & zoom:
+
+<iframe src="../assets/terrainclearance/2026-06-25_66km_map.html" title="Interactive terrain-clearance map" width="100%" height="560" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+
 ## Pipeline
 
 ```mermaid

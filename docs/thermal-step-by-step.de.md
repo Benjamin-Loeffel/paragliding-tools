@@ -50,7 +50,9 @@ Albedo/`f_H` machen aus dem *idealen* Feld das *reale*; die Differenz ist der Wo
 |---|---|
 | ![Driftfeld 15:00](assets/thermalmodel/drift_15h_grid.png) | ![Driftende Plumes](assets/thermalmodel/d1_plumes_grid_3d.png) |
 
-→ interaktives, zeitaufgelöstes 3D (Schieberegler 11/13/15/18 h): [`d1_plumes_hotspots_3d.html`](assets/thermalmodel/d1_plumes_hotspots_3d.html).
+→ interaktives, zeitaufgelöstes 3D (Schieberegler 11/13/15/18 h), hier eingebettet:
+
+<iframe src="../../assets/thermalmodel/d1_plumes_hotspots_3d.html" title="Driftende Thermiksäulen (Zeitschieber)" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
 
 Der Rest dieses README ist die formale Pipeline, die Datenquellen und die Befunde.
 
