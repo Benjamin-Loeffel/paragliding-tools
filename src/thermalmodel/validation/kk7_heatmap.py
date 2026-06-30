@@ -50,18 +50,17 @@ def _decode_intensity(rgba):
 
 def plot_heatmap(grid, mask, dtm, kk7, path, title, dpi=160):
     """Dekodierte kk7-Thermik-Dichte über Hillshade."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from ..plotstyle import use as _use
+    plt = _use()
     from ..viz import draw_hillshade
-    fig, ax = plt.subplots(figsize=(10, 12))
+    fig, ax = plt.subplots(figsize=(13, 15.5))
     ext = draw_hillshade(ax, dtm, grid)
     im = ax.imshow(np.where(mask & np.isfinite(kk7), kk7, np.nan), cmap="viridis",
                    extent=ext, origin="upper", alpha=0.8, vmin=0, vmax=1, interpolation="bilinear")
     fig.colorbar(im, ax=ax, shrink=0.6, label="kk7 Thermik-Dichte (dekodiert, 0–1)")
     ax.set_title(title); ax.set_xlabel("LV95 Ost [m]"); ax.set_ylabel("LV95 Nord [m]"); ax.set_aspect("equal")
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=dpi, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path
 
 

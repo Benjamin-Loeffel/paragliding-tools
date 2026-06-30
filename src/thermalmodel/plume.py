@@ -190,11 +190,10 @@ def _domain_mask(grid, terrain):
 
 def plot_drift_map(grid, mask, dtm, tracks, d0_prob, path, title):
     """2D-Hillshade + D0-Quellfeld + Drift-Pfeile (Auslöser→Top, nach Drift gefärbt)."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
 
-    fig, ax = plt.subplots(figsize=(10, 12))
+    fig, ax = plt.subplots(figsize=(13, 15.5))
     ext = draw_hillshade(ax, dtm, grid)
     ax.imshow(np.where(mask, d0_prob, np.nan), cmap="viridis", extent=ext, origin="upper",
               alpha=0.55, interpolation="nearest")
@@ -209,18 +208,17 @@ def plot_drift_map(grid, mask, dtm, tracks, d0_prob, path, title):
     ax.set_aspect("equal")
     from pathlib import Path
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=185, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path
 
 
 def plot_drift_quiver(grid, mask, dtm, tracks, d0_prob, path, title, arrow_m=130.0, wind_gw=None):
     """Drift-FELD (Netz-Seeds): Richtungspfeile fester Länge, nach Drift-Betrag gefärbt, über D0.
     Optional wind_gw: ICON-Windrichtung als feine graue Hintergrund-Streamlines zum Abgleich."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
 
-    fig, ax = plt.subplots(figsize=(10, 12))
+    fig, ax = plt.subplots(figsize=(13, 15.5))
     ext = draw_hillshade(ax, dtm, grid)
     ax.imshow(np.where(mask, d0_prob, np.nan), cmap="viridis", extent=ext, origin="upper",
               alpha=0.5, interpolation="nearest")
@@ -240,7 +238,7 @@ def plot_drift_quiver(grid, mask, dtm, tracks, d0_prob, path, title, arrow_m=130
     ax.set_aspect("equal"); ax.set_xlim(ext[0], ext[1]); ax.set_ylim(ext[2], ext[3])
     from pathlib import Path
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=185, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path
 
 

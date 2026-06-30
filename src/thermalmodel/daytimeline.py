@@ -84,11 +84,10 @@ def optimal_window(tl) -> tuple:
 
 
 def plot_day_timeline(tl, path, title, dpi=180):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
     h = tl["hrs"]
-    fig, axes = plt.subplots(4, 1, figsize=(12, 13), sharex=True, constrained_layout=True)
+    fig, axes = plt.subplots(4, 1, figsize=(15.5, 16.5), sharex=True, constrained_layout=True)
     win = optimal_window(tl)
 
     ax = axes[0]
@@ -123,5 +122,5 @@ def plot_day_timeline(tl, path, title, dpi=180):
             a.axvline(win[2], color="green", ls="-", lw=1.2, alpha=0.6)
     fig.suptitle(title, fontsize=15)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=dpi, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path

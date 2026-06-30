@@ -129,14 +129,13 @@ def spearman_table(recs) -> dict:
 
 
 def plot_retrospective(recs, path, dpi=170):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from ..plotstyle import use as _use
+    plt = _use()
     from scipy.stats import spearmanr
     x = [r["m_z_i_peak_amsl"] for r in recs]; y = [r["f_top"] for r in recs]
     c = [r["m_xc_day"] for r in recs]
     rho = spearmanr(x, y).correlation
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(10.5, 8))
     sc = ax.scatter(x, y, c=c, cmap="viridis", s=95, edgecolor="k", vmin=0, vmax=100)
     for r in recs:
         ax.annotate(r["date"][5:], (r["m_z_i_peak_amsl"], r["f_top"]), fontsize=7, alpha=0.7)
@@ -144,5 +143,5 @@ def plot_retrospective(recs, path, dpi=170):
     ax.set_xlabel("Modell z_i-Peak (CBL-Top) [m AMSL]"); ax.set_ylabel("Flug max. Thermik-Top [m AMSL]")
     ax.set_title(f"Retrospektive Validierung (eigene IGC, n={len(recs)}) — Spearman z_i~Top = {rho:+.2f}")
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=dpi, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path

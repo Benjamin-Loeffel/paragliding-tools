@@ -174,29 +174,27 @@ def _stream_on_ax(ax, grid, dtm, U, V, density=2.0, vmax_kmh=None):
 
 def plot_wind_traces(grid, mask, dtm, gw: GriddedWind, z_amsl, path, title, density=2.2, dpi=150):
     """Streamplot des ICON-Windfelds in Höhe z über hellem Relief (einzelnes Panel, km/h)."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
     U, V = gw.field_at_height(z_amsl)
-    fig, ax = plt.subplots(figsize=(10, 12))
+    fig, ax = plt.subplots(figsize=(13, 15.5))
     strm, _ = _stream_on_ax(ax, grid, dtm, U, V, density)
     fig.colorbar(strm.lines, ax=ax, shrink=0.6, label="Wind speed [km/h]")
     ax.set_title(title); ax.set_xlabel("LV95 East [m]"); ax.set_ylabel("LV95 North [m]")
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=dpi, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path
 
 
 def plot_wind_traces_levels(grid, mask, dtm, gw: GriddedWind, path, title, dpi=170):
     """5 Höhenstufen als Subplots (1×5): 10/400 m AGL, 2000/2500/3000 m AMSL; Wind in km/h."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
     levels = [("10 m AGL", gw.field_agl(dtm, 10.0)), ("400 m AGL", gw.field_agl(dtm, 400.0)),
               ("2000 m AMSL", gw.field_at_height(2000.0)), ("2500 m AMSL", gw.field_at_height(2500.0)),
               ("3000 m AMSL", gw.field_at_height(3000.0))]
     vmax = max(float(np.nanmax(np.hypot(U, V))) for _, (U, V) in levels) * 3.6 or 1.0
-    fig, axes = plt.subplots(1, 5, figsize=(30, 8.5), constrained_layout=True)
+    fig, axes = plt.subplots(1, 5, figsize=(34, 9), constrained_layout=True)
     strm = None
     for ax, (lbl, (U, V)) in zip(axes, levels):
         strm, _ = _stream_on_ax(ax, grid, dtm, U, V, density=1.7, vmax_kmh=vmax)
@@ -205,5 +203,5 @@ def plot_wind_traces_levels(grid, mask, dtm, gw: GriddedWind, path, title, dpi=1
         fig.colorbar(strm.lines, ax=axes, shrink=0.85, label="Wind speed [km/h]")
     fig.suptitle(title, fontsize=15)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=dpi, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path

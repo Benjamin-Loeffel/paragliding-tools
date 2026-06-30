@@ -108,12 +108,11 @@ def heatmap_metrics(grid, mask, field, kk7, smooth_m=250.0) -> dict:
 
 def plot_validation_map(grid, mask, dtm, score, hotspots, climbs, path, title, kk7=None):
     """Hillshade + Score + Top-Hotspots (Kreise) + reale Steig-Einstiege (Kreuze) + kk7 (Quadrate)."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from ..plotstyle import use as _use
+    plt = _use()
     from ..viz import draw_hillshade
 
-    fig, ax = plt.subplots(figsize=(10, 12))
+    fig, ax = plt.subplots(figsize=(13, 15.5))
     ext = draw_hillshade(ax, dtm, grid)
     ax.imshow(np.where(mask, score, np.nan), cmap="viridis", extent=ext, origin="upper",
               alpha=0.6, interpolation="nearest")
@@ -130,5 +129,5 @@ def plot_validation_map(grid, mask, dtm, score, hotspots, climbs, path, title, k
     ax.legend(loc="upper right", fontsize=9); ax.set_aspect("equal")
     from pathlib import Path
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=175, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path

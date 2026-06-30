@@ -47,12 +47,11 @@ def xc_potential_field(cfg, res, bl, gw, qh_field, wind_height_m=2000.0, step=8)
 
 
 def plot_xc_potential(grid, mask, dtm, thq, path, title):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
     from .viz import draw_hillshade
 
-    fig, ax = plt.subplots(figsize=(10, 12))
+    fig, ax = plt.subplots(figsize=(13, 15.5))
     ext = draw_hillshade(ax, dtm, grid)
     im = ax.imshow(thq, cmap="viridis", extent=ext, origin="upper", alpha=0.78,
                    interpolation="bilinear", vmin=0, vmax=100)
@@ -61,5 +60,5 @@ def plot_xc_potential(grid, mask, dtm, thq, path, title):
     ax.set_aspect("equal")
     from pathlib import Path
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=175, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path

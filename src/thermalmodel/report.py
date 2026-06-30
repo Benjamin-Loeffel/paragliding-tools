@@ -20,12 +20,11 @@ def write_geotiffs(grid: Grid, mask, terrain, heat, score, out_dir: Path, label:
 
 
 def plot_field_png(grid: Grid, mask, dtm, field, hotspots, title, path, cmap="inferno", unit="W/m²"):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
 
     fld = np.where(mask, field, np.nan)
-    fig, ax = plt.subplots(figsize=(9, 11))
+    fig, ax = plt.subplots(figsize=(12, 14.5))
     extent = draw_hillshade(ax, dtm, grid)
     im = ax.imshow(fld, cmap=cmap, extent=extent, origin="upper", alpha=0.8, interpolation="nearest")
     if hotspots:
@@ -39,38 +38,36 @@ def plot_field_png(grid: Grid, mask, dtm, field, hotspots, title, path, cmap="in
     fig.colorbar(im, ax=ax, shrink=0.6, label=unit)
     ax.set_aspect("equal")
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=185, bbox_inches="tight")
+    fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     return path
 
 
 def plot_relief_png(grid: Grid, mask, dtm, path, title):
     """Schritt 1 der Herleitung: das nackte Höhenmodell (Hillshade + Höhen-Tönung)."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
 
     z = np.where(mask, dtm, np.nan)
-    fig, ax = plt.subplots(figsize=(9, 11))
+    fig, ax = plt.subplots(figsize=(12, 14.5))
     extent = draw_hillshade(ax, dtm, grid)
     im = ax.imshow(z, cmap="viridis", extent=extent, origin="upper", alpha=0.55, interpolation="nearest")
     ax.set_title(title); ax.set_xlabel("LV95 East [m]"); ax.set_ylabel("LV95 North [m]")
     fig.colorbar(im, ax=ax, shrink=0.6, label="Elevation [m a.s.l.]")
     ax.set_aspect("equal")
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=170, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path
 
 
 def plot_aspect_slope_png(grid: Grid, mask, terrain, path, title):
     """Schritt 2: aus dem Relief abgeleitete Exposition (Aspekt, zyklisch) + Steilheit (Slope)."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
 
     slope_deg = np.where(mask, np.degrees(terrain.slope), np.nan)
     aspect_deg = np.where(mask, np.degrees(terrain.aspect), np.nan)
-    fig, axes = plt.subplots(1, 2, figsize=(15, 7.5))
+    fig, axes = plt.subplots(1, 2, figsize=(20, 10))
     # Steilheit — sequenziell (viridis)
     ext = draw_hillshade(axes[0], terrain.dtm, grid)
     s = axes[0].imshow(slope_deg, cmap="viridis", extent=ext, origin="upper", alpha=0.8,
@@ -88,7 +85,7 @@ def plot_aspect_slope_png(grid: Grid, mask, terrain, path, title):
     cb.set_ticks([0, 90, 180, 270, 360]); cb.set_ticklabels(["N", "E", "S", "W", "N"])
     fig.suptitle(title, fontsize=15)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=160, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(path, bbox_inches="tight"); plt.close(fig)
     return path
 
 
@@ -220,13 +217,12 @@ def plot_cumulative_panels_png(grid: Grid, mask, dtm, fields, path,
                                suptitle="Cumulative Q_H energy input over the day",
                                unit="Energy input [Wh/m²]"):
     """2×2-Hillshade-Panels (matplotlib), je Cutoff ein Feld, GEMEINSAME Farbskala."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
 
     # gemeinsame Skala: 0 .. Max des grössten (letzten) Cutoffs → Anwachsen sichtbar
     vmax = max(float(np.nanmax(np.where(mask, f, np.nan))) for _, f in fields)
-    fig, axes = plt.subplots(2, 2, figsize=(13, 15), constrained_layout=True)
+    fig, axes = plt.subplots(2, 2, figsize=(17, 19.5), constrained_layout=True)
     im = None
     for ax, (h, f) in zip(axes.ravel(), fields):
         extent = draw_hillshade(ax, dtm, grid)
@@ -238,20 +234,19 @@ def plot_cumulative_panels_png(grid: Grid, mask, dtm, fields, path,
     fig.colorbar(im, ax=axes, shrink=0.6, label=unit)
     fig.suptitle(suptitle, fontsize=15)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=170, bbox_inches="tight")
+    fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     return path
 
 
 def plot_attenuation_timeseries(clouds, path, date=""):
     """Tagesgang Bewölkung + Direktstrahl-Dämpfung (Domänenmittel) — Nachvollziehbarkeit A5b."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from .plotstyle import use as _use
+    plt = _use()
 
     t = clouds.times
     hours = t.hour + t.minute / 60.0
-    fig, ax1 = plt.subplots(figsize=(10, 5))
+    fig, ax1 = plt.subplots(figsize=(13, 6.5))
     ax1.plot(hours, clouds.mean_cloud, color="slategray", lw=2, label="Bewölkung (CLCT)")
     ax1.fill_between(hours, clouds.mean_cloud, color="slategray", alpha=0.2)
     ax1.set_xlabel("Lokalzeit [h]"); ax1.set_ylabel("Bewölkung [%]", color="slategray")
@@ -261,7 +256,7 @@ def plot_attenuation_timeseries(clouds, path, date=""):
     ax2.set_ylabel("Direktstrahl-Faktor f_dir", color="darkorange"); ax2.set_ylim(0, 1.25)
     ax1.set_title(f"ICON-Wolken-Dämpfung im Tagesgang ({clouds.source}) — {date}")
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=170, bbox_inches="tight")
+    fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     return path
 
