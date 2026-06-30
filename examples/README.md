@@ -1,33 +1,33 @@
-# Beispiele
+# Examples
 
-Kleine Eingaben + kuratierte Ergebnisse, damit man beide Use-Cases ohne Vorbereitung ansehen
-und reproduzieren kann. Relief/Wetter/Landcover werden beim Lauf aus den offenen Quellen geholt
-(siehe [`../ATTRIBUTION.md`](../ATTRIBUTION.md)).
+Small inputs + curated results, so that both use cases can be inspected and reproduced
+without any preparation. Relief/weather/landcover are fetched from the open sources at run time
+(see [`../ATTRIBUTION.md`](../ATTRIBUTION.md)).
 
-## Eingaben (`data/`)
-- `igc/` — die **5 längsten** eigenen Flüge (Geräte-IDs entfernt), benannt nach Datum + Streckenlänge.
-- `domain_niesen_frutigen.kml` — Analyse-Polygon (Niesen/Frutigen) für die Thermik-Modellierung.
+## Inputs (`data/`)
+- `igc/` — the **5 longest** of my own flights (device IDs removed), named by date + track length.
+- `domain_niesen_frutigen.kml` — analysis polygon (Niesen/Frutigen) for the thermal modeling.
 
-## Reproduzieren
+## Reproduce
 
 ```bash
-# 1) Hangabstand für einen Beispieltrack
+# 1) Terrain clearance for one example track
 python analyze.py examples/data/igc/2026-06-25_66km.igc
 
-# 2) Thermik-/Meteo-Prognose über das Beispiel-Polygon
+# 2) Thermal/meteo forecast over the example polygon
 python thermal.py --kml examples/data/domain_niesen_frutigen.kml --skip-plume
 
-# 3) Payerne-Radiosonde (Datenquelle für Phase B), aktuellste Sondierung
+# 3) Payerne radiosounding (data source for phase B), latest sounding
 python meteo/radiosonde_payerne.py latest
 ```
 
-## Mitgelieferte Ergebnisse (`output/`)
-- `terrainclearance/` — `…_3d.png` (3D-Relief + Flugspur nach Hangabstand), `…_map.html` (interaktive
-  Karte), `aggregate_clearance_kde.png` (Flugvergleich: Zeit-in-Hangabstand), `risk_over_time.png`,
-  `…_events.csv`, `…_run.json`. Erzeugt mit `--png` (statische PNGs via kaleido).
-- `thermalmodel/` — `qh_ideal_daymax.png` (ideales Wärmebild), `day_timeline.png` („wann starten?"),
-  `drift_15h_grid.png` (Wind-Drift der Thermik um 15 h), `hotspots.html` (interaktiv), `hotspots.csv`.
+## Bundled results (`output/`)
+- `terrainclearance/` — `…_3d.png` (3D relief + flight track by terrain clearance), `…_map.html` (interactive
+  map), `aggregate_clearance_kde.png` (flight comparison: time-in-terrain-clearance), `risk_over_time.png`,
+  `…_events.csv`, `…_run.json`. Generated with `--png` (static PNGs via kaleido).
+- `thermalmodel/` — `qh_ideal_daymax.png` (ideal sensible-heat-flux (Q_H) map), `day_timeline.png` ("when to launch?"),
+  `drift_15h_grid.png` (wind drift of the thermals at 15 h), `hotspots.html` (interactive), `hotspots.csv`.
 
-> Die interaktiven HTML sind self-contained — lokal im Browser öffnen. Grosse 3D-Plots
-> (`…_3d.html`, Plume-Slider) sind bewusst **nicht** eingecheckt; sie entstehen beim eigenen Lauf.
-> kk7-abgeleitete Bilder fehlen bewusst (CC BY-NC-SA; siehe ATTRIBUTION.md).
+> The interactive HTML files are self-contained — open them locally in the browser. Large 3D plots
+> (`…_3d.html`, plume slider) are intentionally **not** checked in; they are produced during your own run.
+> kk7-derived images are intentionally absent (CC BY-NC-SA; see ATTRIBUTION.md).

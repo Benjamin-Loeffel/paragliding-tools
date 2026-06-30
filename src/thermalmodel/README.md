@@ -1,88 +1,117 @@
-# thermalmodel — solargetriebene Thermik-Modellierung (Niesen/Frutigen)
+# thermalmodel — solar-driven thermal modelling (Niesen/Frutigen)
 
-Modelliert die reale Sonneneinstrahlung im Tagesverlauf auf der 3D-Topografie, leitet daraus
-den fühlbaren Wärmestrom (Thermik-Antrieb), Thermik-Hotspots, deren Stärke (w*) und Decke sowie
-driftende Thermik-Säulen ab — validiert gegen eigene IGC-Steigflüge und thermal.kk7.ch.
+Models the real solar irradiance over the course of the day on the 3D topography, derives from it
+the sensible heat flux (thermal driver), thermal hotspots, their strength (w*) and ceiling as well as
+drifting thermal columns — validated against the author's own IGC climbs and thermal.kk7.ch.
 
-Schwester-Paket zu `terrainclearance` (Geländeabstand) und `meteo` (Payerne-Sondierung) und nutzt
-beide nach. **Entscheidungen + Begründungen + Annahmen:** siehe [`docs/thermalmodel-journal.md`](../../docs/thermalmodel-journal.md) (ADRs).
+Sister package to `terrainclearance` (terrain clearance) and `meteo` (Payerne sounding) and reuses
+both. **Decisions + rationale + assumptions:** see [`docs/thermalmodel-journal.md`](../../docs/thermalmodel-journal.md) (ADRs).
 
-## Ausführen
+## Running
 
 ```bash
-python thermal.py                 # kompletter Ablauf
-python thermal.py --skip-plume    # nur Phase A + Validierung
+python thermal.py                 # full pipeline
+python thermal.py --skip-plume    # phase A + validation only
 python thermal.py --date 2026-06-29 --out output/thermal
 ```
 
-Erzeugt in `output/thermal/`: Wärmebilder (PNG/GeoTIFF, ideal + real + Differenz), kumulative
-Energie-Stände (11/13/15/18 h, 2D + je 1 volles 3D-HTML), D0-Quell-Wahrscheinlichkeit (3D),
-Hotspots (GeoJSON/CSV, + `hotspots_strength.csv` mit w*/Ceiling), Validierungskarte,
-D1-Plumes (3 Varianten als 3D mit **Uhrzeit-Slider**), zeitaufgelöste Drifts + Wind-Traces,
-ICON-Wolken-Tagesgang.
+Produces in `output/thermal/`: Q_H maps (PNG/GeoTIFF, ideal + real + difference), cumulative
+energy snapshots (11/13/15/18 h, 2D + one full 3D HTML each), D0 source probability (3D),
+hotspots (GeoJSON/CSV, + `hotspots_strength.csv` with w*/ceiling), validation map,
+D1 plumes (3 variants as 3D with **time-of-day slider**), time-resolved drifts + wind traces,
+ICON cloud diurnal cycle.
 
 ## Pipeline
 
-| Phase | Modul | Inhalt |
-|---|---|---|
-| **A0/A1** | `domain`, `grids`, `terrain_derivs` | KML → 20 m-LV95-Gitter; swissALTI3D-DTM → slope/aspect/curvature |
-| **A2** | `horizon` | Horizontwinkel je Azimut + Sky-View-Factor (gecacht) |
-| **A3–A5** | `solar`, `irradiance` | pvlib Sonnenstand + Ineichen-Klarhimmel, Einfallswinkel, Schatten → G_clear(t) |
-| **A5b** | `nwp` | ICON-CH1-Wolken (Open-Meteo) → Dämpfung f_dir/f_dif/f_ghi → **reales** Wärmebild |
-| **A6/A7** | `landcover`, `heating` | Waldmischungsgrad → Albedo/f_H; Q_H = f_H·(1−albedo)·G; Tagesmax + Energie |
-| **A8** | `hotspots` | Score (Q_H+Konvexität+Aspekt+Slope) → Top-N Hotspots |
-| **D0** | `buoyancy` | validiertes Quell-Wahrscheinlichkeitsfeld (datengetrieben gewichtet) |
-| **B** | `boundarylayer` | Sondierung → w*/Ceiling je Hotspot + **z_i(t)-Tagesgang** (CBL-Encroachment) |
-| **D1** | `plume` | Zweiphasige Plume: hangfolgend → **Ablösung** (Konvexität/Grat/**Waldgrenze**) → freier Drift |
-| **C** | `valleywind`, `wind` | anabatischer Hangaufwind + ICON-Windfeld (icon_seamless, Druckniveaus) |
-| **D1-t** | `timedrift` | zeitaufgelöste Drifts (11/13/15/18 h): je 2 Karten + Wind-Traces (1×5 Höhen, km/h) + **3 Plume-3D-Varianten (Hotspots/kk7/Netz) als Uhrzeit-Slider** |
-| **XC** | `xcpotential` | XC-Flugpotenzial (Tagesgüte 0–100 %, soaringmeteo-Stil) |
-| **Tag** | `daytimeline` | **„Wann starten?"**: w*/z_i/Wind/Scherung/XC über den Tag + Startfenster |
-| **Val.** | `validation/` | IGC-Steigflüge + kk7-Hotspots **+ kk7-Heatmap** → verschiebungstolerante Hit-Rate/AUC |
-| **Retro** | `validation/retrospective` | retrospektive Prognose-Skill: eigene Flugtage × historisches Wetter (ERA5/ICON) |
+```mermaid
+flowchart TD
+    A["A: Solar -> clear-sky irradiance -> shadow/SVF"] --> A5b["A5b: ICON cloud attenuation -> real Q_H"]
+    A5b --> A67["A6/7: Landcover -> albedo/f_H -> Q_H"]
+    A67 --> A8["A8: Hotspots"]
+    A8 --> D0["D0: validated source field"]
+    D0 --> B["B: Sounding -> z_i(t)/w*/ceiling"]
+    B --> C["C: Valley wind + ICON wind field"]
+    C --> D1["D1: two-phase plume: terrain-following -> release -> free drift"]
+    D1 --> DT["Time-resolved drifts (11/13/15/18 h)"]
+    DT --> VAL["Validation (IGC climbs + kk7) / XC potential / daily timeline"]
+```
 
-## Datenquellen (alle frei)
+| Phase | Module | Content |
+|---|---|---|
+| **A0/A1** | `domain`, `grids`, `terrain_derivs` | KML → 20 m LV95 grid; swissALTI3D DTM → slope/aspect/curvature |
+| **A2** | `horizon` | Horizon angle per azimuth + sky-view factor (cached) |
+| **A3–A5** | `solar`, `irradiance` | pvlib solar position + Ineichen clear-sky, angle of incidence, shadow → G_clear(t) |
+| **A5b** | `nwp` | ICON-CH1 clouds (Open-Meteo) → attenuation f_dir/f_dif/f_ghi → **real** Q_H map |
+| **A6/A7** | `landcover`, `heating` | Forest mixing ratio → albedo/f_H; Q_H = f_H·(1−albedo)·G; daily max + energy |
+| **A8** | `hotspots` | Score (Q_H+convexity+aspect+slope) → top-N hotspots |
+| **D0** | `buoyancy` | validated source-probability field (data-driven weighting) |
+| **B** | `boundarylayer` | Sounding → w*/ceiling per hotspot + **z_i(t) diurnal cycle** (CBL encroachment) |
+| **D1** | `plume` | Two-phase plume: terrain-following → **release** (convexity/ridge/**forest edge**) → free drift |
+| **C** | `valleywind`, `wind` | anabatic upslope wind + ICON wind field (icon_seamless, pressure levels) |
+| **D1-t** | `timedrift` | time-resolved drifts (11/13/15/18 h): 2 maps each + wind traces (1×5 altitudes, km/h) + **3 plume-3D variants (hotspots/kk7/grid) as time-of-day slider** |
+| **XC** | `xcpotential` | XC flight potential (daily quality 0–100 %, soaringmeteo style) |
+| **Day** | `daytimeline` | **"When to launch?"**: w*/z_i/wind/shear/XC over the day + launch window |
+| **Val.** | `validation/` | IGC climbs + kk7 hotspots **+ kk7 heatmap** → shift-tolerant hit rate/AUC |
+| **Retro** | `validation/retrospective` | retrospective forecast skill: own flying days × historical weather (ERA5/ICON) |
+
+## Data sources (all free)
 
 - **Relief:** swissALTI3D (swisstopo STAC) — via `terrainclearance`.
-- **Wald Nadel/Laub:** BAFU/LFI-Waldmischungsgrad (10 m, EPSG:2056).
-- **Wolken/Strahlung:** ICON-CH1 via Open-Meteo (`models=meteoswiss_icon_ch1`, GRIB-frei).
-- **Sondierung:** Payerne (MeteoSwiss OGD) — via `meteo/`.
-- **Validierung:** eigene IGC (`source/igc`) + thermal.kk7.ch (offene REST-API).
+- **Forest conifer/broadleaf:** BAFU/LFI forest mixing ratio (10 m, EPSG:2056).
+- **Clouds/radiation:** ICON-CH1 via Open-Meteo (`models=meteoswiss_icon_ch1`, GRIB-free).
+- **Sounding:** Payerne (MeteoSwiss OGD) — via `meteo/`.
+- **Validation:** own IGC (`source/igc`) + thermal.kk7.ch (open REST API).
 
-## Ergebnisse (Modelltag 2026-06-30; Phase-A-Zahlen vom Referenzlauf 29.06.)
+## Results (model day 2026-06-30; phase-A figures from the reference run 29 June)
 
-- **Reales Wärmebild:** 99 % bewölkt → Q_H-Tagesenergie ideal→real median 2669→1467 Wh/m² (~45 % Wolkenverlust).
-- **Validierung** (verschiebungstolerant, gegen Zufall): Phase-A-Score AUC **0.66**, **D0 0.71**
-  (IGC ≈ kk7 → robust). Lift ×2.2–2.4 @300 m. Terrain-Geometrie trägt das Signal; ein
-  Triggerlinien-Term hatte keinen Skill (verworfen).
-- **Phase B:** w* median **1.56 m/s** (max 2.24), Ceiling ~3200–3600 m AMSL — plausibel.
-- **D1 + Phase C:** anabatischer Hangaufwind bringt die Drift-Rate auf **70 m/min ≈ IGC 74**.
-  Ablöse-Modell: Hotspots liegen schon auf konvexen Graten (Release-Versatz median 40 m).
-- **Zeitaufgelöst:** Drift 11→15 h steigend (Wind 0.9→1.6 m/s), 18 h Kollaps (schwache Heizung);
-  Drift-Pfeile decken sich mit den ICON-Wind-Streamlines (visueller Abgleich).
-- **XC-Potenzial:** median 59 %, hohe sonnige Grate ~100 %. soaringmeteo bestätigt unser w*
-  (ihr hartcodierter Median 1.55 = unsere 1.56).
-- **z_i(t)/„Wann starten":** CBL wächst, bricht ~13–14 h durch die Inversion, w* peakt ~14:00 →
-  **optimales Startfenster 12–16 h**. Drifts diurnal: morgens kurz (flache CBL), 15 h max, abends Kollaps.
-- **kk7-Heatmap** (kontinuierlich, verschiebungstolerant): D0 Spearman 0.26/AUC 0.66 vs. Phase-A-Score
-  0.05/0.55; Zeitabgleich (jul_04/07/10) verbessert NICHT → Thermik-*Orte* terrain-kontrolliert.
-- **Retrospektive Validierung** (`--retrospective`, eigene Flugtage × ERA5/ICON-Historie): z_i-Peak
-  bester Prädiktor (Spearman +0.48 vs. Thermik-Top); n=8 → indikativ, mehr Flüge (WeGlide/XContest) offen.
-- **Plot-Politik:** nur Sequential-Maps (viridis Standard, inferno Energie, cividis Wind), helles
-  Relief für Kontrast, Wind in km/h.
+- **Real Q_H map:** 99 % cloudy → Q_H daily energy ideal→real median 2669→1467 Wh/m² (~45 % cloud loss).
+- **Validation** (shift-tolerant, against chance): phase-A score AUC **0.66**, **D0 0.71**
+  (IGC ≈ kk7 → robust). Lift ×2.2–2.4 @300 m. Terrain geometry carries the signal; a
+  trigger-line term had no skill (rejected).
+- **Phase B:** w* median **1.56 m/s** (max 2.24), ceiling ~3200–3600 m AMSL — plausible.
+- **D1 + phase C:** anabatic upslope wind brings the drift rate up to **70 m/min ≈ IGC 74**.
+  Release model: hotspots already sit on convex ridges (release offset median 40 m).
+- **Time-resolved:** drift 11→15 h rising (wind 0.9→1.6 m/s), 18 h collapse (weak heating);
+  drift arrows align with the ICON wind streamlines (visual comparison).
+- **XC potential:** median 59 %, high sunny ridges ~100 %. soaringmeteo confirms our w*
+  (their hard-coded median 1.55 = our 1.56).
+- **z_i(t)/"when to launch":** CBL grows, breaks through the inversion ~13–14 h, w* peaks ~14:00 →
+  **optimal launch window 12–16 h**. Drifts diurnal: short in the morning (shallow CBL), max at 15 h, evening collapse.
+- **kk7 heatmap** (continuous, shift-tolerant): D0 Spearman 0.26/AUC 0.66 vs. phase-A score
+  0.05/0.55; time matching (jul_04/07/10) does NOT improve → thermal *locations* are terrain-controlled.
+- **Retrospective validation** (`--retrospective`, own flying days × ERA5/ICON history): z_i peak
+  best predictor (Spearman +0.48 vs. thermal top); n=8 → indicative, more flights (WeGlide/XContest) pending.
+- **Plot policy:** sequential maps only (viridis default, inferno energy, cividis wind), bright
+  relief for contrast, wind in km/h.
 
-Ausgaben u. a.: `qh_*` (Wärmebilder), `energy_3d*.html`, `d0_thermal_source_3d.html`,
-`d1_plumes_{hotspots,grid,kk7}_3d.html` (3D-Plumes mit **Uhrzeit-Slider** 11/13/15/18 h),
-`d1_drift_map.png` (Tagesmax-Referenz), `drift_HHh_points.png`/`drift_HHh_grid.png`,
+Outputs include: `qh_*` (Q_H maps), `energy_3d*.html`, `d0_thermal_source_3d.html`,
+`d1_plumes_{hotspots,grid,kk7}_3d.html` (3D plumes with **time-of-day slider** 11/13/15/18 h),
+`d1_drift_map.png` (daily-max reference), `drift_HHh_points.png`/`drift_HHh_grid.png`,
 `wind_traces_HHh.png`, `xc_potential.png`, `validation_map.png`, `hotspots*.{csv,geojson}`.
 
-## Grenzen & Nächstes
+## Key findings / reasoning
 
-- Statisches/kinematisches Proxy: AUC ~0.7 ist literaturtypisch; **>0.8 braucht dynamische
-  Prädiktoren** (Tageswetter, Wind, Konvergenz).
-- Sondierung ist Tiefland-Punkt (Payerne) → Bergthermik nur näherungsweise.
-- ICON/Sondierung nur ~24 h verfügbar → Tages-Pulls gecacht; Validierung ist klimatologisch.
-- **Fernziel:** Phase C (dedizierte Talwind-Parametrisierung, Lee/Luv), D2 (Massfluss/CA),
+```mermaid
+flowchart TD
+    ZI["z_i is the robust predictor (not w*)"]
+    TERRAIN["Terrain controls the LOCATION (time-invariant)"]
+    TIME["Time of day controls strength/ceiling/drift"]
+    REJECT["Rejected by cross-validation: edge term & lee/windward term"]
+    OVERFIT["They overfit; kk7 acts as the guardian"]
+
+    ZI --> TIME
+    TERRAIN --> TIME
+    REJECT --> OVERFIT
+    TERRAIN --> REJECT
+```
+
+## Limits & next
+
+- Static/kinematic proxy: AUC ~0.7 is literature-typical; **>0.8 needs dynamic
+  predictors** (daily weather, wind, convergence).
+- Sounding is a lowland point (Payerne) → mountain thermals only approximate.
+- ICON/sounding only available ~24 h → daily pulls cached; validation is climatological.
+- **Long-term goal:** phase C (dedicated valley-wind parametrisation, lee/windward), D2 (mass flux/CA),
   **D3–D5 LES** (microHH/PALM, WSL2/GPU).
 
-Abhängigkeiten: `pip install -e .[thermal]` (definiert in `pyproject.toml`).
+Dependencies: `pip install -e .[thermal]` (defined in `pyproject.toml`).

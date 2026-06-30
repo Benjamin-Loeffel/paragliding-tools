@@ -1,28 +1,28 @@
-# Gleitschirm-Geländeabstand-Analyse
+# Paraglider Terrain-Clearance Analysis
 
-Berechnet für **jeden Punkt eines IGC-Flugtracks den minimalen 3D-Abstand zum Gelände**
-auf Basis der höchstaufgelösten swisstopo-Höhenmodelle und findet so **kritische
-Flugmomente mit wenig Hangabstand**. Berücksichtigt **Wald/Bewuchs und Gebäude**
-(Abstand zur Baumkrone, nicht nur zum nackten Boden), schätzt die **GPS-bedingte
-Unsicherheit** des Abstands (Monte Carlo) und wertet die **Verteilung über die Flugzeit**
-sowie die **Risiko-Entwicklung über mehrere Flüge** aus.
+Computes, **for every point of an IGC flight track, the minimum 3D distance to the terrain**
+based on the highest-resolution swisstopo elevation models, thereby finding **critical
+flight moments with little terrain clearance**. Accounts for **forest/vegetation and
+buildings** (distance to the tree canopy, not just to the bare ground), estimates the
+**GPS-induced uncertainty** of the clearance (Monte Carlo) and evaluates the **distribution
+over flight time** as well as the **risk evolution across multiple flights**.
 
-Funktioniert für jeden Flug im swisstopo-Abdeckungsgebiet (Schweiz); die Beispieltracks
-liegen im Berner Oberland.
+Works for any flight within the swisstopo coverage area (Switzerland); the example tracks
+lie in the Bernese Oberland.
 
 ---
 
-## Datenquellen (swisstopo, frei)
+## Data sources (swisstopo, free)
 
-- **swissALTI3D** – Geländemodell (DTM, nackter Boden), 0.5 m –
+- **swissALTI3D** – terrain model (DTM, bare ground), 0.5 m –
   <https://www.swisstopo.admin.ch/de/hoehenmodell-swissalti3d>
-- **swissSURFACE3D Raster** – Oberflächenmodell (DSM, inkl. Vegetation & Gebäude), 0.5 m –
+- **swissSURFACE3D Raster** – surface model (DSM, incl. vegetation & buildings), 0.5 m –
   <https://www.swisstopo.admin.ch/de/hoehenmodell-swisssurface3d-raster>
 
-Kacheln werden automatisch passend zum Flug über die **STAC-API** geladen (nur der
-Track-Umkreis), unter `cache/` zwischengespeichert und über Flüge derselben Region
-wiederverwendet. Pro Kachel wird der **neueste Jahrgang** genommen (z. B. swissALTI3D 2025
-statt 2019). Ein manueller Download ist **nicht** nötig.
+Tiles are loaded automatically to match the flight via the **STAC API** (only the
+track surroundings), cached under `cache/` and reused across flights of the same region.
+For each tile the **newest vintage** is taken (e.g. swissALTI3D 2025 instead of 2019).
+A manual download is **not** required.
 
 ## Installation (Windows, Python 3.11+)
 
@@ -31,126 +31,161 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -e .
 ```
 
-Kein separates GDAL/PROJ nötig – `rasterio` und `pyproj` bringen die Binärbibliotheken
-als Wheel mit. (`kaleido` ist nur für statische PNG-Exports nötig und nicht erforderlich.)
+No separate GDAL/PROJ needed – `rasterio` and `pyproj` ship the binary libraries
+as wheels. (`kaleido` is only needed for static PNG exports and is not required.)
 
-## Nutzung
+## Usage
 
 ```powershell
-# Einzelner Flug (mitgelieferter Beispieltrack)
+# Single flight (bundled example track)
 .venv\Scripts\python.exe analyze.py examples\data\igc\2026-06-25_66km.igc
 
-# Alle Flüge in einem Ordner (Saison-Auswertung)
+# All flights in a folder (season analysis)
 .venv\Scripts\python.exe analyze.py examples\data\igc
 
-# Schneller ohne Monte-Carlo-Band
+# Faster without the Monte-Carlo band
 .venv\Scripts\python.exe analyze.py examples\data\igc --no-uncertainty
 ```
 
-### Wichtige Optionen
+### Key options
 
-| Option | Wirkung (Default) |
+| Option | Effect (default) |
 |---|---|
-| `--resolution {0.5\|2}` | Rasterauflösung (0.5 m; DSM bleibt immer 0.5 m) |
-| `--r-cap <m>` | Max. 3D-Suchradius (300) |
-| `--calibration {auto\|gnss\|pressure\|none}` | Höhenquelle/Kalibrierung (auto) |
-| `--no-uncertainty` / `--sigma-h <m>` / `--sigma-v <m>` | Monte-Carlo-Band aus / GPS-σ (an / 3 / 5) |
-| `--no-3d` / `--surface3d-model {dsm\|dtm}` | 3D-Plot aus / Relief-Modell (an / dsm) |
-| `--surface3d-max-dim <n>` / `--surface3d-darkness <0..1>` | 3D-Auflösung / Dunkelheit (700 / 0.7) |
-| `--surface3d-color {clearance\|p05\|mean}` | 3D-Spur-Einfärbung (clearance) |
-| `--timezone <tz>` / `--no-proj-network` | Zeitzone (Europe/Zurich) / PROJ-Netz aus |
+| `--resolution {0.5\|2}` | Raster resolution (0.5 m; DSM always stays 0.5 m) |
+| `--r-cap <m>` | Max. 3D search radius (300) |
+| `--calibration {auto\|gnss\|pressure\|none}` | Altitude source/calibration (auto) |
+| `--no-uncertainty` / `--sigma-h <m>` / `--sigma-v <m>` | Monte-Carlo band off / GPS σ (on / 3 / 5) |
+| `--no-3d` / `--surface3d-model {dsm\|dtm}` | 3D plot off / relief model (on / dsm) |
+| `--surface3d-max-dim <n>` / `--surface3d-darkness <0..1>` | 3D resolution / darkness (700 / 0.7) |
+| `--surface3d-color {clearance\|p05\|mean}` | 3D track coloring (clearance) |
+| `--timezone <tz>` / `--no-proj-network` | Time zone (Europe/Zurich) / PROJ network off |
 
-## Ausgaben (`output/`)
+## Outputs (`output/`)
 
-| Datei | Inhalt |
+| File | Content |
 |---|---|
-| `*_map.html` | Interaktive Karte: Track nach 3D-Geländeabstand eingefärbt, kritische Stellen markiert. |
-| `*_3d.html` | Interaktiver **3D-Plot**: mattes, dunkles Hillshade-Relief + drehbare Flugspur, eingefärbt nach Abstand; MC-Band im Hover. |
-| `*_barogram.html` | Höhenprofil (Flughöhe / Gelände / Oberfläche) + Abstand-über-Zeit mit Schwellen, Events und **Unsicherheitsband** (p05–p95). |
-| `*_clearance_kde.html` | **Zeit-Verteilung** über den Hangabstand: Dichte + **kumulativ** („% der Zeit unter X m"), Gelände und Wald. |
-| `aggregate_clearance_kde.html` | **Mehrflug-Zusammenzug** (Dichte + kumulativ; pro Flug + Ø + zeitgewichtetes Total), auf Flugdauer normiert. |
-| `risk_over_time.html` | **Risiko über Zeit**: Hangabstand-Perzentile (p05/p10/p25/Median) + Zeitanteil unter Schwellen je Flug, chronologisch. |
-| `*_points.csv` | Pro Fix alle Werte inkl. MC-Band (mean/p05/p95/min/max). |
-| `*_events.csv` | Kritische Momente: Zeit, Ort, Level, Phase (Flug/Landeanflug), Abstände inkl. p05/p95. |
-| `*_run.json` | Metadaten: Kachel-Jahrgänge, Kalibrier-Offset/-Konfidenz, Transform-Pipeline, MC-σ. |
+| `*_map.html` | Interactive map: track colored by 3D terrain clearance, critical spots marked. |
+| `*_3d.html` | Interactive **3D plot**: matte, dark hillshade relief + rotatable flight track, colored by clearance; MC band in the hover. |
+| `*_barogram.html` | Altitude profile (flight altitude / terrain / surface) + clearance-over-time with thresholds, events and **uncertainty band** (p05–p95). |
+| `*_clearance_kde.html` | **Time distribution** over terrain clearance: density + **cumulative** ("% of time below X m"), terrain and forest. |
+| `aggregate_clearance_kde.html` | **Multi-flight aggregate** (density + cumulative; per flight + mean + time-weighted total), normalized to flight duration. |
+| `risk_over_time.html` | **Risk over time**: terrain-clearance percentiles (p05/p10/p25/median) + share of time below thresholds per flight, chronological. |
+| `*_points.csv` | Per fix all values incl. MC band (mean/p05/p95/min/max). |
+| `*_events.csv` | Critical moments: time, location, level, phase (flight/landing approach), clearances incl. p05/p95. |
+| `*_run.json` | Metadata: tile vintages, calibration offset/confidence, transform pipeline, MC σ. |
 
-Alle HTML sind **self-contained** (plotly inline) und offline öffenbar.
+All HTML files are **self-contained** (plotly inline) and can be opened offline.
 
 ---
 
-## Methodik
+## Pipeline
 
-- **3D-Abstand mit adaptivem Suchradius:** Für einen Punkt P und jede Rasterzelle im
-  Horizontalabstand `d` gilt `3D = sqrt(d²+Δz²) ≥ d`. Der vertikale Bodenabstand
-  `V = z − Boden(x,y)` ist damit eine **obere Schranke** für den 3D-Abstand, also genügt
-  ein Suchradius `R = min(|V|+margin, r_cap)`. Das ist **exakt** für alle bodennahen
-  (kritischen) Punkte und sehr schnell; hohe, unkritische Punkte werden grob abgetastet
-  und als `clipped` markiert. Gerechnet wird gegen DTM (Hangabstand) **und** DSM
-  (Abstand zu Wipfel/Dach). Verifiziert gegen Brute-Force und `scipy.cKDTree` (0.0000 m
-  Abweichung bei unkritischen Punkten).
-- **Höhen-Kalibrierung:** Die GNSS-Höhe (`HFALG:GEO`, geoid-bezogen) hat einen nahezu
-  konstanten Versatz (Datum LN02 + GPS-Bias). Ein additiver Offset wird so bestimmt, dass
-  die am Boden (vor Start / nach Landung) aufgezeichnete Höhe zum DTM passt – das
-  absorbiert Datum **und** Bias gemeinsam. Boden-Erkennung via geglättetem Speed/Vario.
-- **Wald/Bewuchs:** separater Abstand zum DSM. Ein Event ist `Gelände` oder `Wald/Objekt`,
-  je nachdem, was näher ist – so werden bewaldete Steilhänge korrekt als kritischer erkannt
-  als der nackte Boden.
-- **Kritische Momente:** lokale Minima unter konfigurierbaren Schwellen
-  (Gelände 50/30/15 m, Oberfläche 30/15/5 m). Bodenkontakt bei Start/Landung zählt nicht;
-  reine Endabstiege heissen `Landeanflug`; die „im Flug"-Minimumstatistik klammert den
-  finalen Landeabstieg aus.
-- **GPS-Unsicherheit (Monte Carlo):** Der Hangabstand reagiert empfindlich auf den
-  GPS-Fehler (in steilem Gelände horizontal ~1:1, vertikal 1:1). Jede Position wird N-fach
-  normalverteilt gestört (σ_h, σ_v) und gegen denselben Gelände-Patch gerechnet → Mittel,
-  p05–p95, min/max. Niedrige Punkte voll per MC, weit über Grund analytisch (σ ≈ σ_v).
-  Das Band steckt im Barogramm, in den CSVs und im 3D-Hover.
-- **Zeit-Verteilung:** zeitgewichtete KDE des Hangabstands (Dichte + kumulative ECDF) pro
-  Flug und als Zusammenzug über alle Flüge, normiert auf die Flugdauer.
-- **Risiko über Zeit:** je Flug (chronologisch) die tiefen Hangabstand-Perzentile und der
-  Zeitanteil unter den Schwellen – zeigt, wie sich die Annäherung ans Gelände entwickelt.
-- **3D-Relief:** monochrome, **matte Schummerung (Hillshade)** aus dem DEM (kein Glanz),
-  bewusst **dunkel** gehalten, damit die rot→grün-Abstandsspur abhebt und das Relief
-  (Rinnen/Grate) klar lesbar bleibt; echte Proportionen (`aspectmode='data'`).
+```mermaid
+flowchart TD
+    A[Load IGC] --> B[Altitude calibration<br/>ground offset]
+    B --> C[STAC: DTM/DSM tiles<br/>newest vintage, cached]
+    C --> D[Adaptive 3D clearance<br/>vs DTM=slope & DSM=forest/buildings]
+    D --> E[Critical events<br/>thresholds, phase]
+    E --> F[Monte-Carlo uncertainty]
+    F --> G[Distributions KDE/ECDF<br/>+ risk over time]
+    G --> H[Outputs<br/>map / 3D / barogram / CSV]
+```
 
-## Entscheidungen & Begründungen
+## Methodology
 
-Die wichtigsten gemeinsam getroffenen Entscheidungen:
+- **3D distance with adaptive search radius:** For a point P and every raster cell at
+  horizontal distance `d`, `3D = sqrt(d²+Δz²) ≥ d` holds. The vertical ground clearance
+  `V = z − ground(x,y)` is therefore an **upper bound** on the 3D distance, so a search
+  radius `R = min(|V|+margin, r_cap)` suffices. This is **exact** for all near-ground
+  (critical) points and very fast; high, uncritical points are sampled coarsely and
+  marked `clipped`. Computed against DTM (terrain clearance) **and** DSM (distance to
+  canopy/roof). Verified against brute force and `scipy.cKDTree` (0.0000 m deviation for
+  uncritical points).
+- **Altitude calibration:** The GNSS altitude (`HFALG:GEO`, geoid-referenced) has a nearly
+  constant offset (LN02 datum + GPS bias). An additive offset is determined such that the
+  altitude recorded on the ground (before launch / after landing) matches the DTM – this
+  absorbs datum **and** bias jointly. Ground detection via smoothed speed/vario.
+- **Forest/vegetation:** separate distance to the DSM. An event is `terrain` or
+  `forest/object`, whichever is closer – so forested steep slopes are correctly recognized
+  as more critical than the bare ground.
+- **Critical moments:** local minima below configurable thresholds
+  (terrain 50/30/15 m, surface 30/15/5 m). Ground contact at launch/landing does not count;
+  pure final descents are called `landing approach`; the "in-flight" minimum statistic
+  excludes the final landing descent.
+- **GPS uncertainty (Monte Carlo):** Terrain clearance reacts sensitively to GPS error
+  (in steep terrain horizontally ~1:1, vertically 1:1). Each position is perturbed N times
+  with a normal distribution (σ_h, σ_v) and computed against the same terrain patch → mean,
+  p05–p95, min/max. Low points fully via MC, well above ground analytically (σ ≈ σ_v).
+  The band is embedded in the barogram, in the CSVs and in the 3D hover.
+- **Time distribution:** time-weighted KDE of the terrain clearance (density + cumulative
+  ECDF) per flight and as an aggregate across all flights, normalized to flight duration.
+- **Risk over time:** per flight (chronological) the low terrain-clearance percentiles and
+  the share of time below the thresholds – shows how the approach to the terrain evolves.
+- **3D relief:** monochrome, **matte hillshade** from the DEM (no glare), deliberately kept
+  **dark** so the red→green clearance track stands out and the relief (gullies/ridges)
+  stays clearly legible; true proportions (`aspectmode='data'`).
 
-1. **Echter 3D-Abstand statt nur vertikal (AGL).** „Hangabstand" ist beim Soaren seitlich
-   definiert; man kann 400 m über dem Talboden, aber 20 m neben einer Wand sein. Der
-   vertikale AGL-Wert wird als Beiprodukt mitgeführt.
-2. **Höchste Auflösung (0.5 m)**, nur Track-Umkreis laden + cachen. 2 m optional für Tempo.
-3. **Neuester Kachel-Jahrgang** je Position ("modernste Modelle"); überschreibbar.
-4. **GNSS-Höhe als Quelle** (geoid-bezogen, `HFALG:GEO`). Druckhöhe ist ISA-referenziert
-   → für Absoluthöhen ungeeignet. Handy-Tracks (XCTrack) haben Druck = 0, GNSS ist nutzbar.
-5. **Boden-Kalibrierung statt REFRAME-Höhentransformation:** ein konstanter Offset
-   absorbiert Höhendatum (LN02) und GPS-Bias zusammen. REFRAME diente nur zur Prüfung der
-   Horizontalgenauigkeit.
-6. **Horizontal-Transformation lokal mit pyproj** (WGS84→LV95): gegen die swisstopo-REFRAME-API
-   auf **0.01 m** validiert → kein CHENYX06-Grid nötig (das gilt nur für das alte LV03).
-7. **Wald über DSM (swissSURFACE3D)**, separat zum nackten Gelände; Events nach beidem.
-8. **Start/Landung nicht als Flug-Event;** Endabstiege als `Landeanflug` gekennzeichnet
-   (statt versteckt) – nichts wird unterschlagen, aber korrekt eingeordnet.
-9. **Unsicherheit per Monte Carlo** mit σ_h = 3 m, σ_v = 5 m (u-blox; Handy höher),
-   N = 80, volles MC unter 80 m Abstand, sonst analytisch. Band als p05–p95 (robust) plus
-   min/max. **MC auch im 3D** (Hover; optional konservative Einfärbung nach p05).
-10. **Verteilungs- statt nur Momentaufnahme-Sicht:** zeitgewichtete KDE + kumulative ECDF,
-    plus Risiko-über-Zeit, um Muster über die Saison sichtbar zu machen.
-11. **3D matt, dunkel, Hillshade** (nicht glänzend/hell) und Display-Downsampling: volle
-    0.5 m über einen ganzen Flug wären ~36 Mio. Punkte und sprengen jeden Browser; der
-    Default (~4–5 m) ist via `--surface3d-max-dim` steigerbar.
-12. **Self-contained HTML** (offline öffenbar, ohne Server/Token).
-13. **Flugdaten (`source/igc/`) sind versioniert** – konsistent mit den ursprünglichen
-    Tracks und für reproduzierbare Auswertungen. Bei Bedarf per `.gitignore` ausschliessbar.
+## Design assumptions
 
-## Genauigkeit & Grenzen
+```mermaid
+mindmap
+  root((Design<br/>assumptions))
+    True 3D distance
+      not just vertical AGL
+      slope clearance is lateral
+    GNSS altitude
+      ground calibration absorbs datum + bias
+    Adaptive search radius
+      R = min of |V|+margin and r_cap
+      exact for near-ground points
+    Forest via DSM
+      distance to canopy/roof
+    Monte Carlo
+      clearance is GPS-error sensitive
+```
 
-- **GNSS-Höhe:** Handy-Tracks sind vertikal verrauschter als dedizierte Logger
-  (u-blox). Kalibrier-Konfidenz steht in `*_run.json`. Absolutwerte haben einige Meter
-  Unsicherheit – das MC-Band zeigt sie; Abstände unter ~5 m nicht überinterpretieren
-  (meist Landung/Bodenkontakt).
-- **DTM-/DSM-Jahrgänge** können abweichen (DTM oft neuer) → Waldhöhe mit kleinem Vorbehalt.
-- **`clipped`-Punkte** (Abstand > `r_cap`) sind nicht exakt, aber unkritisch.
+## Decisions & rationale
+
+The most important jointly made decisions:
+
+1. **True 3D distance instead of just vertical (AGL).** "Terrain clearance" when soaring is
+   defined laterally; you can be 400 m above the valley floor yet 20 m next to a wall. The
+   vertical AGL value is carried along as a by-product.
+2. **Highest resolution (0.5 m)**, loading + caching only the track surroundings. 2 m
+   optional for speed.
+3. **Newest tile vintage** per position ("most modern models"); overridable.
+4. **GNSS altitude as the source** (geoid-referenced, `HFALG:GEO`). Pressure altitude is
+   ISA-referenced → unsuitable for absolute altitudes. Phone tracks (XCTrack) have
+   pressure = 0, GNSS is usable.
+5. **Ground calibration instead of REFRAME altitude transformation:** a constant offset
+   absorbs the altitude datum (LN02) and GPS bias together. REFRAME only served to check
+   the horizontal accuracy.
+6. **Horizontal transformation locally with pyproj** (WGS84→LV95): validated against the
+   swisstopo REFRAME API to **0.01 m** → no CHENYX06 grid needed (that applies only to the
+   old LV03).
+7. **Forest via DSM (swissSURFACE3D)**, separate from the bare terrain; events based on both.
+8. **Launch/landing not as a flight event;** final descents marked as `landing approach`
+   (rather than hidden) – nothing is suppressed, but everything is classified correctly.
+9. **Uncertainty via Monte Carlo** with σ_h = 3 m, σ_v = 5 m (u-blox; phone higher),
+   N = 80, full MC below 80 m clearance, otherwise analytical. Band as p05–p95 (robust) plus
+   min/max. **MC also in the 3D** (hover; optionally conservative coloring by p05).
+10. **Distribution view instead of just a snapshot:** time-weighted KDE + cumulative ECDF,
+    plus risk-over-time, to make patterns over the season visible.
+11. **3D matte, dark, hillshade** (not glossy/bright) and display downsampling: full
+    0.5 m over an entire flight would be ~36 million points and would blow up any browser;
+    the default (~4–5 m) can be increased via `--surface3d-max-dim`.
+12. **Self-contained HTML** (openable offline, without server/token).
+13. **Flight data (`source/igc/`) is versioned** – consistent with the original tracks and
+    for reproducible analyses. Can be excluded via `.gitignore` if needed.
+
+## Accuracy & limits
+
+- **GNSS altitude:** Phone tracks are vertically noisier than dedicated loggers
+  (u-blox). Calibration confidence is in `*_run.json`. Absolute values have a few meters of
+  uncertainty – the MC band shows them; do not over-interpret clearances below ~5 m
+  (usually landing/ground contact).
+- **DTM/DSM vintages** may differ (DTM often newer) → forest height with a small caveat.
+- **`clipped` points** (distance > `r_cap`) are not exact, but uncritical.
 
 ## Tests
 
@@ -158,25 +193,25 @@ Die wichtigsten gemeinsam getroffenen Entscheidungen:
 .venv\Scripts\python.exe -m pytest tests -q
 ```
 
-## Projektstruktur
+## Project structure
 
 ```
-analyze.py                  Einstiegspunkt (python analyze.py source\igc)
+analyze.py                  Entry point (python analyze.py source\igc)
 src/terrainclearance/
-  config.py                 alle Parameter (Schwellen, σ, Auflösung, 3D-Optik …)
-  igc_loader.py             IGC lesen, Höhenquelle pro Datei wählen
-  geo.py                    WGS84 -> LV95 (pyproj, cm-genau)
-  stac.py                   STAC-Abfrage, Kachelauswahl (neuester Jahrgang)
-  tiles.py                  Download/Cache, Mosaik, bilineares Sampling, Patches
-  terrain.py                adaptiver 3D-Abstand (DTM & DSM)
-  calibrate.py              Boden-Erkennung + Höhen-Offset
-  critical.py               Events, Schweregrad, Phase (Flug/Landeanflug)
-  uncertainty.py            Monte-Carlo-Unsicherheitsband
-  distribution.py           Zeit-Verteilung (KDE/ECDF), Aggregat, Risiko-über-Zeit
-  report.py                 Karte, 3D, Barogramm, CSV/JSON
-  pipeline.py               Orchestrierung pro Flug
-  cli.py                    Kommandozeile
-tests/                      pytest-Suite
-examples/data/igc/          Beispieltracks (5 längste Flüge; eigene Tracks lokal, gitignored)
-cache/  output/             generiert (gitignored)
+  config.py                 all parameters (thresholds, σ, resolution, 3D optics …)
+  igc_loader.py             read IGC, choose altitude source per file
+  geo.py                    WGS84 -> LV95 (pyproj, cm-accurate)
+  stac.py                   STAC query, tile selection (newest vintage)
+  tiles.py                  download/cache, mosaic, bilinear sampling, patches
+  terrain.py                adaptive 3D distance (DTM & DSM)
+  calibrate.py              ground detection + altitude offset
+  critical.py               events, severity, phase (flight/landing approach)
+  uncertainty.py            Monte-Carlo uncertainty band
+  distribution.py           time distribution (KDE/ECDF), aggregate, risk-over-time
+  report.py                 map, 3D, barogram, CSV/JSON
+  pipeline.py               orchestration per flight
+  cli.py                    command line
+tests/                      pytest suite
+examples/data/igc/          example tracks (5 longest flights; own tracks local, gitignored)
+cache/  output/             generated (gitignored)
 ```

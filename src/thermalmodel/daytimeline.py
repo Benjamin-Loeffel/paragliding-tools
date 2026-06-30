@@ -93,29 +93,29 @@ def plot_day_timeline(tl, path, title, dpi=180):
 
     ax = axes[0]
     ax.fill_between(h, tl["xc"], color="#3b528b", alpha=0.35); ax.plot(h, tl["xc"], color="#3b528b", lw=2)
-    ax.set_ylabel("XC-Potenzial [%]"); ax.set_ylim(0, 100); ax.set_title("Tagesgüte (Flugpotenzial)")
+    ax.set_ylabel("XC potential [%]"); ax.set_ylim(0, 100); ax.set_title("Day quality (flight potential)")
 
     ax = axes[1]
-    ax.plot(h, tl["wstar"], color="#21918c", lw=2, label="w* (Median Hotspots)")
+    ax.plot(h, tl["wstar"], color="#21918c", lw=2, label="w* (median hotspots)")
     ax.axhline(1.5, ls=":", c="grey", lw=1); ax.axhline(2.0, ls=":", c="grey", lw=1)
     ax.set_ylabel("w* [m/s]"); ax.legend(loc="upper left", fontsize=9)
     axb = ax.twinx(); axb.plot(h, tl["z_i_amsl"], color="#440154", lw=2, label="z_i (CBL) AMSL")
     axb.set_ylabel("z_i [m AMSL]", color="#440154"); axb.legend(loc="upper right", fontsize=9)
-    ax.set_title("Thermikstärke w*(t) + Mischungsschicht z_i(t)")
+    ax.set_title("Thermal strength w*(t) + mixing layer z_i(t)")
 
     ax = axes[2]
     ax.plot(h, tl["wind_bl"] * 3.6, color="#5ec962", lw=2, label="Wind BL @2500 m")
-    ax.plot(h, tl["shear"] * 3.6, color="#fde725", lw=2, label="Scherung |V_top−V_10m|")
+    ax.plot(h, tl["shear"] * 3.6, color="#fde725", lw=2, label="Shear |V_top−V_10m|")
     ax.axhline(tl["cloud_destroy_ms"] * 3.6, ls="--", c="red", lw=1.4,
-               label="Zerstörungs-Schwelle (~25 km/h)")
+               label="Destruction threshold (~25 km/h)")
     ax.set_ylabel("Wind [km/h]"); ax.legend(loc="upper left", fontsize=9)
-    ax.set_title("Wind & Scherung — Thermik-Zerstörung")
+    ax.set_title("Wind & shear — thermal destruction")
 
     ax = axes[3]
     ax.fill_between(h, 0, 1, where=tl["viable"], color="#5ec962", alpha=0.3, transform=ax.get_xaxis_transform())
     ax.plot(h, tl["qh"], color="#e8702a", lw=2, label="Q_H (real) [W/m²]")
-    ax.set_ylabel("Q_H [W/m²]"); ax.set_xlabel("Lokalzeit [h]")
-    ax.legend(loc="upper left", fontsize=9); ax.set_title("Heizung Q_H(t) + brauchbares Fenster (grün)")
+    ax.set_ylabel("Q_H [W/m²]"); ax.set_xlabel("Local time [h]")
+    ax.legend(loc="upper left", fontsize=9); ax.set_title("Heating Q_H(t) + usable window (green)")
 
     if win:
         for a in axes:

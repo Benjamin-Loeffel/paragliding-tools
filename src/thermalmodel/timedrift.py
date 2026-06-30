@@ -92,13 +92,13 @@ def run_time_resolved(cfg, res, bl, vw, session=None):
                  h, float(np.median(qh_t[mask])), float(cbl["z_i_amsl"][idx]), g, da, db)
         plot_drift_map(grid, mask, dtm, tr_a, res["d0"].prob,
                        out / f"drift_{h:02d}h_points.png",
-                       f"Thermik-Drift {h:02d}:00 — Hotspots + kk7 ({cfg.date})")
+                       f"Thermal drift {h:02d}:00 — hotspots + kk7 ({cfg.date})")
         plot_drift_quiver(grid, mask, dtm, grid2d_tr, res["d0"].prob,
                           out / f"drift_{h:02d}h_grid.png",
-                          f"Thermik-Drift-Feld {h:02d}:00 — {cfg.drift_grid_spacing_m:.0f} m-Netz ({cfg.date})",
+                          f"Thermal drift field {h:02d}:00 — {cfg.drift_grid_spacing_m:.0f} m grid ({cfg.date})",
                           wind_gw=gw)
         plot_wind_traces_levels(grid, mask, dtm, gw, out / f"wind_traces_{h:02d}h.png",
-                                f"ICON-Wind-Traces {h:02d}:00 ({cfg.wind_model}) — {cfg.date}")
+                                f"ICON wind traces {h:02d}:00 ({cfg.wind_model}) — {cfg.date}")
 
     # Die 3 Plume-Varianten zeitaufgelöst als je 1 HTML mit Uhrzeit-Slider (11/13/15/18 h)
     hh = "/".join(f"{h:02d}" for h in cfg.cumulative_hours_drift)
@@ -131,7 +131,7 @@ def run_time_resolved(cfg, res, bl, vw, session=None):
         from .daytimeline import compute_day_timeline, plot_day_timeline, optimal_window
         tl = compute_day_timeline(cfg, res, bl, wf)
         plot_day_timeline(tl, out / "day_timeline.png",
-                          f"Thermik-Tagesgang Niesen/Frutigen — {cfg.date}")
+                          f"Thermal diurnal cycle Niesen/Frutigen — {cfg.date}")
         win = optimal_window(tl)
         if win:
             log.info("Optimales Startfenster: %.0f–%.0f Uhr (Bestzeit ~%.0f:%02d), "

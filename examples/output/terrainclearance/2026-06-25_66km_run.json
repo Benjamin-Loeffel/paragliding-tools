@@ -65,11 +65,5 @@
     "2616-1161": 2022
   },
   "transform_pipeline": "axis order change (2D) + Inverse of CH1903+ to WGS 84 (1) + Swiss Oblique Mercator 1995",
-  "r_cap_m": 300.0,
-  "uncertainty": {
-    "sigma_h_m": 3.0,
-    "sigma_v_m": 5.0,
-    "n_samples": 80,
-    "calib_iqr_m": 0.25820517170927815
-  }
+  "r_cap_m": 300.0
 }

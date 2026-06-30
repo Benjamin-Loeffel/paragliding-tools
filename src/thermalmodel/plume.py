@@ -205,7 +205,7 @@ def plot_drift_map(grid, mask, dtm, tracks, d0_prob, path, title):
                     arrowprops=dict(arrowstyle="->", color=plt.cm.viridis(t.drift_m / dmax),
                                     lw=1.6, alpha=0.9))
         ax.plot(t.e[0], t.n[0], "o", ms=3, color="white", mec="black", mew=0.4)
-    ax.set_title(title); ax.set_xlabel("LV95 Ost [m]"); ax.set_ylabel("LV95 Nord [m]")
+    ax.set_title(title); ax.set_xlabel("LV95 East [m]"); ax.set_ylabel("LV95 North [m]")
     ax.set_aspect("equal")
     from pathlib import Path
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -235,8 +235,8 @@ def plot_drift_quiver(grid, mask, dtm, tracks, d0_prob, path, title, arrow_m=130
     mag = np.hypot(de, dn); u = arrow_m * de / np.maximum(mag, 1e-6); v = arrow_m * dn / np.maximum(mag, 1e-6)
     q = ax.quiver(e0, n0, u, v, mag, angles="xy", scale_units="xy", scale=1.0,
                   cmap="viridis", width=0.0035, headwidth=3)
-    fig.colorbar(q, ax=ax, shrink=0.6, label="Drift Auslöser→Top [m]")
-    ax.set_title(title); ax.set_xlabel("LV95 Ost [m]"); ax.set_ylabel("LV95 Nord [m]")
+    fig.colorbar(q, ax=ax, shrink=0.6, label="Drift trigger→top [m]")
+    ax.set_title(title); ax.set_xlabel("LV95 East [m]"); ax.set_ylabel("LV95 North [m]")
     ax.set_aspect("equal"); ax.set_xlim(ext[0], ext[1]); ax.set_ylim(ext[2], ext[3])
     from pathlib import Path
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -260,10 +260,10 @@ def build_plume_3d(grid, mask, dtm, tracks, path, title):
         fig.add_trace(go.Scatter3d(
             x=X, y=Y, z=Z, mode="lines", connectgaps=False, hoverinfo="skip", showlegend=False,
             line=dict(width=3, color=C, colorscale="Viridis",
-                      colorbar=dict(title="Höhe [m]"), showscale=True)))
+                      colorbar=dict(title="Altitude [m]"), showscale=True)))
     fig.update_layout(title=title, margin=dict(l=0, r=0, t=40, b=0),
-                      scene=dict(xaxis_title="Ost [m]", yaxis_title="Nord [m]",
-                                 zaxis_title="Höhe [m]", aspectmode="data"))
+                      scene=dict(xaxis_title="East [m]", yaxis_title="North [m]",
+                                 zaxis_title="Altitude [m]", aspectmode="data"))
     from pathlib import Path
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(str(path), include_plotlyjs=True)
@@ -299,7 +299,7 @@ def build_plume_3d_timeslider(grid, mask, dtm, tracks_by_hour, path, title):
         return go.Scatter3d(x=X or [None], y=Y or [None], z=Z or [None], mode="lines",
                             connectgaps=False, hoverinfo="skip", showlegend=False,
                             line=dict(width=3, color=C or [cmin], colorscale="Viridis",
-                                      cmin=cmin, cmax=cmax, colorbar=dict(title="Höhe [m]"), showscale=True))
+                                      cmin=cmin, cmax=cmax, colorbar=dict(title="Altitude [m]"), showscale=True))
 
     frames = [go.Frame(data=[trace(tracks_by_hour[h])], name=f"{h:02d}", traces=[1]) for h in hours]
     fig = go.Figure(data=[surface, trace(tracks_by_hour[hours[0]])], frames=frames)
@@ -307,10 +307,10 @@ def build_plume_3d_timeslider(grid, mask, dtm, tracks_by_hour, path, title):
                   args=[[f"{h:02d}"], dict(mode="immediate", frame=dict(duration=0, redraw=True),
                                            transition=dict(duration=0))]) for h in hours]
     fig.update_layout(title=title, margin=dict(l=0, r=0, t=40, b=0),
-                      sliders=[dict(active=0, currentvalue=dict(prefix="Uhrzeit "), pad=dict(t=40),
+                      sliders=[dict(active=0, currentvalue=dict(prefix="Time "), pad=dict(t=40),
                                     steps=steps)],
-                      scene=dict(xaxis_title="Ost [m]", yaxis_title="Nord [m]",
-                                 zaxis_title="Höhe [m]", aspectmode="data"))
+                      scene=dict(xaxis_title="East [m]", yaxis_title="North [m]",
+                                 zaxis_title="Altitude [m]", aspectmode="data"))
     from pathlib import Path
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(str(path), include_plotlyjs=True)

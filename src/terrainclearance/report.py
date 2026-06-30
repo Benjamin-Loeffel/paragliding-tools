@@ -56,14 +56,14 @@ def _hover(track, alt_cal, clr, i, times, unc=None) -> str:
         return f"{x:.0f} {unit}" if np.isfinite(x) else "—"
     txt = (
         f"{times[i]:%H:%M:%S}<br>"
-        f"Höhe: {fmt(alt_cal[i])}<br>"
-        f"3D Gelände: {fmt(clr.d3_terrain[i])}<br>"
-        f"3D Oberfläche: {fmt(clr.d3_surface[i])}<br>"
-        f"AGL (vertikal): {fmt(clr.v_terrain[i])}<br>"
-        f"über Wipfel/Dach: {fmt(clr.v_surface[i])}"
+        f"Altitude: {fmt(alt_cal[i])}<br>"
+        f"3D terrain: {fmt(clr.d3_terrain[i])}<br>"
+        f"3D surface: {fmt(clr.d3_surface[i])}<br>"
+        f"AGL (vertical): {fmt(clr.v_terrain[i])}<br>"
+        f"above canopy/roof: {fmt(clr.v_surface[i])}"
     )
     if unc is not None:
-        txt += (f"<br><i>MC Gelände p05–p95: {fmt(unc.p05_terrain[i])}–{fmt(unc.p95_terrain[i])}</i>")
+        txt += (f"<br><i>MC terrain p05–p95: {fmt(unc.p05_terrain[i])}–{fmt(unc.p95_terrain[i])}</i>")
     return txt
 
 
@@ -87,9 +87,9 @@ def build_map(track: FlightTrack, alt_cal, clr: ClearanceResult,
             color=clr.d3_terrain,
             colorscale=_COLORSCALE,
             cmin=0, cmax=cfg.color_max_m,
-            colorbar=dict(title="3D-Abstand<br>Gelände [m]"),
+            colorbar=dict(title="3D clearance<br>terrain [m]"),
         ),
-        text=hover, hoverinfo="text", name="Abstand",
+        text=hover, hoverinfo="text", name="Clearance",
     ))
     # Kritische Events
     if events:
@@ -99,10 +99,10 @@ def build_map(track: FlightTrack, alt_cal, clr: ClearanceResult,
             marker=dict(size=15, color="rgba(0,0,0,0)",
                         symbol="circle"),
             text=[f"{e.level.upper()} · {e.phase} ({e.reason})<br>"
-                  f"{e.iso_time}<br>3D Gelände {e.d3_terrain:.0f} m / "
-                  f"Oberfläche {e.d3_surface:.0f} m" for e in events],
+                  f"{e.iso_time}<br>3D terrain {e.d3_terrain:.0f} m / "
+                  f"surface {e.d3_surface:.0f} m" for e in events],
             hoverinfo="text",
-            name="kritisch",
+            name="critical",
         ))
         # auffälliger Rand für Events
         fig.add_trace(go.Scattermap(
@@ -120,7 +120,7 @@ def build_map(track: FlightTrack, alt_cal, clr: ClearanceResult,
                  center=dict(lat=float(np.mean(track.lat)), lon=float(np.mean(track.lon))),
                  zoom=_zoom(bbox)),
         margin=dict(l=0, r=0, t=40, b=0),
-        title=f"{track.name} — Geländeabstand",
+        title=f"{track.name} — terrain clearance",
         legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0),
     )
     return fig
@@ -131,7 +131,7 @@ def build_barogram(track: FlightTrack, alt_cal, clr: ClearanceResult,
     times = _local_times(track.dt, cfg.timezone)
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
                         row_heights=[0.58, 0.42],
-                        subplot_titles=("Höhenprofil", "3D-Abstand zum Gelände / zur Oberfläche"))
+                        subplot_titles=("Altitude profile", "3D distance to terrain / surface"))
 
     # Unsicherheitsband (p05–p95) hinter die Abstandslinien
     if unc is not None:
@@ -139,27 +139,27 @@ def build_barogram(track: FlightTrack, alt_cal, clr: ClearanceResult,
                                  showlegend=False, hoverinfo="skip"), row=2, col=1)
         fig.add_trace(go.Scatter(x=times, y=unc.p05_terrain, mode="lines", line=dict(width=0),
                                  fill="tonexty", fillcolor="rgba(26,150,65,0.18)",
-                                 name="Gelände p05–p95", hoverinfo="skip"), row=2, col=1)
+                                 name="Terrain p05–p95", hoverinfo="skip"), row=2, col=1)
 
     # Reihe 1: Höhen
-    fig.add_trace(go.Scatter(x=times, y=clr.terrain_elev, name="Gelände (DTM)",
+    fig.add_trace(go.Scatter(x=times, y=clr.terrain_elev, name="Terrain (DTM)",
                              line=dict(color="#8c6d31"), fill="tozeroy",
                              fillcolor="rgba(140,109,49,0.25)"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=times, y=clr.surface_elev, name="Oberfläche (DSM)",
+    fig.add_trace(go.Scatter(x=times, y=clr.surface_elev, name="Surface (DSM)",
                              line=dict(color="#3a7d3a", dash="dot")), row=1, col=1)
-    fig.add_trace(go.Scatter(x=times, y=alt_cal, name="Flughöhe (kalibriert)",
+    fig.add_trace(go.Scatter(x=times, y=alt_cal, name="Flight altitude (calibrated)",
                              line=dict(color="#1f4e9c", width=2)), row=1, col=1)
 
     # Reihe 2: Abstände
-    fig.add_trace(go.Scatter(x=times, y=clr.d3_terrain, name="3D Gelände",
+    fig.add_trace(go.Scatter(x=times, y=clr.d3_terrain, name="3D terrain",
                              line=dict(color="#1a9641")), row=2, col=1)
-    fig.add_trace(go.Scatter(x=times, y=clr.d3_surface, name="3D Oberfläche",
+    fig.add_trace(go.Scatter(x=times, y=clr.d3_surface, name="3D surface",
                              line=dict(color="#d7191c", dash="dot")), row=2, col=1)
 
     caution, warning, danger = cfg.crit_terrain_m
-    for val, txt, col in [(caution, "Achtung", "#feb24c"),
-                          (warning, "Warnung", "#fd8d3c"),
-                          (danger, "Gefahr", "#d7191c")]:
+    for val, txt, col in [(caution, "Caution", "#feb24c"),
+                          (warning, "Warning", "#fd8d3c"),
+                          (danger, "Danger", "#d7191c")]:
         fig.add_hline(y=val, line=dict(color=col, dash="dash", width=1),
                       annotation_text=txt, annotation_position="right", row=2, col=1)
 
@@ -171,10 +171,10 @@ def build_barogram(track: FlightTrack, alt_cal, clr: ClearanceResult,
             name="Events", hovertext=[f"{e.level} · {e.phase} ({e.reason})" for e in events],
         ), row=2, col=1)
 
-    fig.update_yaxes(title_text="m ü. M.", row=1, col=1)
-    fig.update_yaxes(title_text="Abstand [m]", rangemode="tozero", row=2, col=1)
-    fig.update_xaxes(title_text=f"Zeit ({cfg.timezone})", row=2, col=1)
-    fig.update_layout(title=f"{track.name} — Barogramm & Abstand",
+    fig.update_yaxes(title_text="m a.s.l.", row=1, col=1)
+    fig.update_yaxes(title_text="Clearance [m]", rangemode="tozero", row=2, col=1)
+    fig.update_xaxes(title_text=f"Time ({cfg.timezone})", row=2, col=1)
+    fig.update_layout(title=f"{track.name} — barogram & clearance",
                       hovermode="x unified", margin=dict(l=60, r=20, t=60, b=40))
     return fig
 
@@ -237,19 +237,19 @@ def build_terrain3d(track: FlightTrack, e, n, alt_cal, clr: ClearanceResult,
                     events: list[Event], dtm, dsm, cfg: Config, unc=None) -> go.Figure:
     use_dsm = cfg.surface3d_model == "dsm" and dsm is not None
     surf = dsm if use_dsm else dtm
-    surf_name = ("Oberfläche (swissSURFACE3D, inkl. Wald/Gebäude)" if use_dsm
-                 else "Gelände (swissALTI3D)")
+    surf_name = ("Surface (swissSURFACE3D, incl. forest/buildings)" if use_dsm
+                 else "Terrain (swissALTI3D)")
     det = clr.d3_surface if use_dsm else clr.d3_terrain
     track_clear = det
-    suffix = " Oberfläche" if use_dsm else " Gelände"
-    clear_title = f"3D-Abstand<br>{suffix.strip()} [m]"
+    suffix = " surface" if use_dsm else " terrain"
+    clear_title = f"3D clearance<br>{suffix.strip()} [m]"
     # MC im 3D berücksichtigen: optional nach konservativer Untergrenze/Mittel einfärben
     if unc is not None and cfg.surface3d_color_by in ("p05", "mean"):
         src = {"p05": (unc.p05_surface if use_dsm else unc.p05_terrain),
                "mean": (unc.mean_surface if use_dsm else unc.mean_terrain)}[cfg.surface3d_color_by]
         track_clear = src
-        tag = "p05 (konservativ)" if cfg.surface3d_color_by == "p05" else "Mittel"
-        clear_title = f"3D-Abstand {tag}<br>{suffix.strip()} [m]"
+        tag = "p05 (conservative)" if cfg.surface3d_color_by == "p05" else "mean"
+        clear_title = f"3D clearance {tag}<br>{suffix.strip()} [m]"
 
     m = cfg.surface3d_margin_m
     win = _grid_window(surf, e.min() - m, e.max() + m, n.min() - m, n.max() + m,
@@ -290,7 +290,7 @@ def build_terrain3d(track: FlightTrack, e, n, alt_cal, clr: ClearanceResult,
         x=e - e0, y=n - n0, z=alt_cal, mode="markers",
         marker=dict(size=2.5, color=track_clear, colorscale=_COLORSCALE,
                     cmin=0, cmax=cfg.color_max_m, colorbar=dict(title=clear_title)),
-        text=hover, hoverinfo="text", name="Flugspur",
+        text=hover, hoverinfo="text", name="Flight track",
     ))
     if events:
         fig.add_trace(go.Scatter3d(
@@ -299,14 +299,14 @@ def build_terrain3d(track: FlightTrack, e, n, alt_cal, clr: ClearanceResult,
             marker=dict(size=5, symbol="diamond", line=dict(color="black", width=1),
                         color=[_EVENT_COLOR.get(ev.level, "#feb24c") for ev in events]),
             text=[f"{ev.level.upper()} · {ev.phase}<br>{ev.iso_time}<br>"
-                  f"Gelände {ev.d3_terrain:.0f} m / Oberfläche {ev.d3_surface:.0f} m"
+                  f"Terrain {ev.d3_terrain:.0f} m / Surface {ev.d3_surface:.0f} m"
                   for ev in events],
-            hoverinfo="text", name="kritisch",
+            hoverinfo="text", name="critical",
         ))
 
     fig.update_layout(
-        title=f"{track.name} — 3D-Relief & Flugspur",
-        scene=dict(xaxis_title="Ost [m]", yaxis_title="Nord [m]", zaxis_title="Höhe [m ü. M.]",
+        title=f"{track.name} — 3D relief & flight track",
+        scene=dict(xaxis_title="East [m]", yaxis_title="North [m]", zaxis_title="Altitude [m a.s.l.]",
                    aspectmode="data"),
         margin=dict(l=0, r=0, t=40, b=0),
         legend=dict(orientation="h", yanchor="bottom", y=0.0, x=0),

@@ -35,7 +35,7 @@ def plot_field_png(grid: Grid, mask, dtm, field, hotspots, title, path, cmap="in
         for h in hotspots[:10]:
             ax.annotate(str(h.id), (h.e, h.n), color="cyan", fontsize=7, ha="center", va="center")
     ax.set_title(title)
-    ax.set_xlabel("LV95 Ost [m]"); ax.set_ylabel("LV95 Nord [m]")
+    ax.set_xlabel("LV95 East [m]"); ax.set_ylabel("LV95 North [m]")
     fig.colorbar(im, ax=ax, shrink=0.6, label=unit)
     ax.set_aspect("equal")
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -45,7 +45,7 @@ def plot_field_png(grid: Grid, mask, dtm, field, hotspots, title, path, cmap="in
 
 
 def build_energy_3d(grid: Grid, mask, dtm, energy, hotspots, path, title,
-                    colorbar="Energieeintrag [Wh/m²]", cmin=None, cmax=None, colorscale="Inferno"):
+                    colorbar="Energy input [Wh/m²]", cmin=None, cmax=None, colorscale="Inferno"):
     """Plotly-3D-Relief (volle Gitterauflösung), Boden nach Feldwert eingefärbt (Sequential-Map)."""
     import plotly.graph_objects as go
 
@@ -58,7 +58,7 @@ def build_energy_3d(grid: Grid, mask, dtm, energy, hotspots, path, title,
     fig = go.Figure()
     fig.add_trace(go.Surface(
         x=xs, y=ys, z=z, surfacecolor=c, colorscale=colorscale, cmin=cmin, cmax=cmax,
-        colorbar=dict(title=colorbar), name="Q_H-Energie",
+        colorbar=dict(title=colorbar), name="Q_H energy",
         lighting=dict(ambient=0.65, diffuse=0.6, specular=0.1), hoverinfo="skip",
     ))
     if hotspots:
@@ -70,7 +70,7 @@ def build_energy_3d(grid: Grid, mask, dtm, energy, hotspots, path, title,
             hoverinfo="text", name="Hotspots"))
     fig.update_layout(
         title=title,
-        scene=dict(xaxis_title="Ost [m]", yaxis_title="Nord [m]", zaxis_title="Höhe [m ü. M.]",
+        scene=dict(xaxis_title="East [m]", yaxis_title="North [m]", zaxis_title="Altitude [m a.s.l.]",
                    aspectmode="data"),
         margin=dict(l=0, r=0, t=40, b=0))
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -79,8 +79,8 @@ def build_energy_3d(grid: Grid, mask, dtm, energy, hotspots, path, title,
 
 
 def plot_cumulative_panels_png(grid: Grid, mask, dtm, fields, path,
-                               suptitle="Kumulierter Energieeintrag Q_H über den Tag",
-                               unit="Energieeintrag [Wh/m²]"):
+                               suptitle="Cumulative Q_H energy input over the day",
+                               unit="Energy input [Wh/m²]"):
     """2×2-Hillshade-Panels (matplotlib), je Cutoff ein Feld, GEMEINSAME Farbskala."""
     import matplotlib
     matplotlib.use("Agg")
@@ -95,7 +95,7 @@ def plot_cumulative_panels_png(grid: Grid, mask, dtm, fields, path,
         im = ax.imshow(np.where(mask, f, np.nan), cmap="inferno", extent=extent, origin="upper",
                        alpha=0.85, interpolation="nearest", vmin=0.0, vmax=vmax)
         ax.set_title(f"bis {int(h):02d}:00 Uhr", fontsize=13)
-        ax.set_xlabel("LV95 Ost [m]"); ax.set_ylabel("LV95 Nord [m]")
+        ax.set_xlabel("LV95 East [m]"); ax.set_ylabel("LV95 North [m]")
         ax.set_aspect("equal")
     fig.colorbar(im, ax=axes, shrink=0.6, label=unit)
     fig.suptitle(suptitle, fontsize=15)
@@ -159,7 +159,7 @@ def plot_hotspot_map_html(hotspots, cfg: ThermalConfig, path):
     fig.update_layout(
         map=dict(style=cfg.map_style,
                  center=dict(lat=float(np.mean(lats)), lon=float(np.mean(lons))), zoom=11.5),
-        margin=dict(l=0, r=0, t=40, b=0), title="Thermik-Hotspots (Phase A, ideal)")
+        margin=dict(l=0, r=0, t=40, b=0), title="Thermal hotspots (Phase A, ideal)")
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(str(path), include_plotlyjs=True)
     return path

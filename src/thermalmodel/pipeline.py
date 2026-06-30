@@ -67,11 +67,11 @@ def run_phase_a(cfg: ThermalConfig) -> dict:
     out = Path(cfg.output_dir)
     write_geotiffs(grid, mask, terrain, heat, score, out, "ideal")
     png = plot_field_png(grid, mask, terrain.dtm, heat.Q_H_daymax, hotspots,
-                         f"Ideales Wärmebild Q_H (Tagesmax) — {cfg.date}", out / "qh_ideal_daymax.png")
+                         f"Ideal Q_H heat-flux map (daily max) — {cfg.date}", out / "qh_ideal_daymax.png")
     html = plot_hotspot_map_html(hotspots, cfg, out / "hotspots.html")
     build_energy_3d(grid, mask, terrain.dtm, heat.Q_H_energy, hotspots,
                     out / "energy_3d.html",
-                    f"Eingebrachte Energiemenge Q_H (ideal) — {cfg.date}")
+                    f"Deposited Q_H energy (ideal) — {cfg.date}")
     # D0: Thermik-Quell-Wahrscheinlichkeit (validiertes Proxy) als GeoTIFF + 3D
     grid.to_geotiff(np.where(mask, d0.prob, np.nan), out / "d0_thermal_source.tif")
     build_energy_3d(grid, mask, terrain.dtm, d0.prob, hotspots, out / "d0_thermal_source_3d.html",
@@ -82,9 +82,9 @@ def run_phase_a(cfg: ThermalConfig) -> dict:
     cum = cumulative_energy_at(heat, cfg.cumulative_hours)
     cum_png = plot_cumulative_panels_png(
         grid, mask, terrain.dtm, cum, out / "energy_cumulative_panels.png",
-        f"Kumulierter Energieeintrag Q_H (ideal) — {cfg.date}")
+        f"Cumulative Q_H energy input (ideal) — {cfg.date}")
     cum_3d_paths, _ = build_cumulative_energy_3d_files(
-        grid, mask, terrain.dtm, cum, out, f"Energieeintrag Q_H (ideal, {cfg.date})")
+        grid, mask, terrain.dtm, cum, out, f"Q_H energy input (ideal, {cfg.date})")
     for h, f in cum:
         grid.to_geotiff(np.where(mask, f, np.nan), out / f"qh_ideal_energy_bis{int(h):02d}h.tif")
 
@@ -101,10 +101,10 @@ def run_phase_a(cfg: ThermalConfig) -> dict:
         real["att_png"] = plot_attenuation_timeseries(clouds, out / "icon_attenuation.png", cfg.date)
         real["daymax_png"] = plot_field_png(
             grid, mask, terrain.dtm, heat_real.Q_H_daymax, hotspots,
-            f"Reales Wärmebild Q_H (Tagesmax, ICON-Wolken) — {cfg.date}", out / "qh_real_daymax.png")
+            f"Real Q_H heat-flux map (daily max, ICON clouds) — {cfg.date}", out / "qh_real_daymax.png")
         real["diff_png"] = plot_field_png(
             grid, mask, terrain.dtm, diff_energy, None,
-            f"Wolken-Verlust Q_H-Energie (ideal − real) — {cfg.date}", out / "qh_diff_energy.png",
+            f"Cloud loss of Q_H energy (ideal − real) — {cfg.date}", out / "qh_diff_energy.png",
             cmap="inferno", unit="Wh/m²")
         build_energy_3d(grid, mask, terrain.dtm, heat_real.Q_H_energy, hotspots,
                         out / "energy_3d_real.html",

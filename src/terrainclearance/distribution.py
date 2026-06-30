@@ -141,11 +141,11 @@ def build_flight_kde(name: str, clr_terrain, clr_surface, t_s, airborne, cfg: Co
     return fig
 
 
-def build_aggregate_kde(flights: list[FlightDist], cfg: Config, which: str = "Gelände") -> go.Figure:
+def build_aggregate_kde(flights: list[FlightDist], cfg: Config, which: str = "terrain") -> go.Figure:
     grid = _grid(cfg)
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08,
-                        subplot_titles=("Dichte (pro Flug, auf Flugdauer normiert)",
-                                        "Kumulativ: Anteil der Flugzeit UNTER x"))
+                        subplot_titles=("Density (per flight, normalised to flight time)",
+                                        "Cumulative: share of flight time BELOW x"))
     for d in flights:
         label = f"{d.name} ({d.duration_s/60:.0f} min)"
         dens = _weighted_density(d.clearance, d.weights, grid)
@@ -156,38 +156,29 @@ def build_aggregate_kde(flights: list[FlightDist], cfg: Config, which: str = "Ge
         if cdf is not None:
             fig.add_trace(go.Scatter(x=grid, y=cdf, name=label, line=dict(width=1), opacity=0.55,
                                      legendgroup=d.name, showlegend=False), row=2, col=1)
-    # Mittelung (Ø pro Flug) bewusst entfernt — nur Einzelflüge + zeitgewichtetes Total.
-    all_c = np.concatenate([d.clearance for d in flights]) if flights else np.array([])
-    all_w = np.concatenate([d.weights for d in flights]) if flights else np.array([])
-    pooled = _weighted_density(all_c, all_w, grid)
-    pooled_cdf = weighted_cdf(all_c, all_w, grid)
-    if pooled is not None:
-        fig.add_trace(go.Scatter(x=grid, y=pooled * 100.0, name="Total (zeitgewichtet)",
-                                 line=dict(color="#1f4e9c", width=3, dash="dot")), row=1, col=1)
-    if pooled_cdf is not None:
-        fig.add_trace(go.Scatter(x=grid, y=pooled_cdf, name="Total", line=dict(color="#1f4e9c", width=3, dash="dot"),
-                                 showlegend=False), row=2, col=1)
+    # Mittelung (Ø pro Flug) UND zeitgewichtetes Total bewusst entfernt — gezeigt werden nur die
+    # Einzelflüge, damit der Vergleich zwischen den Flügen im Vordergrund steht.
     ct, wt, dg = cfg.crit_terrain_m
     for r in (1, 2):
         for val, col in [(ct, "#feb24c"), (wt, "#fd8d3c"), (dg, "#d7191c")]:
             fig.add_vline(x=val, line=dict(color=col, dash="dash", width=1), row=r, col=1)
     total_h = sum(d.duration_s for d in flights) / 3600.0
-    fig.update_yaxes(title_text="% pro m", row=1, col=1)
-    fig.update_yaxes(title_text="% der Zeit darunter", range=[0, 100], row=2, col=1)
-    fig.update_xaxes(title_text="Hangabstand [m]", row=2, col=1)
-    fig.update_layout(title=f"Hangabstand-Verteilung über {len(flights)} Flüge ({total_h:.1f} h) — {which}",
+    fig.update_yaxes(title_text="% per m", row=1, col=1)
+    fig.update_yaxes(title_text="% of time below", range=[0, 100], row=2, col=1)
+    fig.update_xaxes(title_text="Terrain clearance [m]", row=2, col=1)
+    fig.update_layout(title=f"Terrain-clearance distribution over {len(flights)} flights ({total_h:.1f} h) — {which}",
                       hovermode="x unified", margin=dict(l=60, r=20, t=70, b=40))
     return fig
 
 
 def build_risk_over_time(flights: list[FlightDist], cfg: Config) -> go.Figure:
-    """Verschiebung der 'Risikobereitschaft' über die Zeit: tiefe Abstands-Perzentile
-    und Zeitanteil unter Schwellen, pro Flug chronologisch."""
+    """Shift in 'risk appetite' over time: low clearance percentiles and the share of time
+    below thresholds, per flight, chronological."""
     fl = [d for d in flights if d.start_dt is not None and d.clearance.size > 0]
     fl.sort(key=lambda d: d.start_dt)
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1, row_heights=[0.62, 0.38],
-                        subplot_titles=("Hangabstand-Perzentile je Flug (tiefer = mehr Risiko)",
-                                        "Anteil der Flugzeit unter Schwelle"))
+                        subplot_titles=("Terrain-clearance percentiles per flight (lower = more risk)",
+                                        "Share of flight time below threshold"))
     if not fl:
         return fig
     dates = [np.datetime64(d.start_dt, "s").astype("datetime64[s]").astype("O") for d in fl]
@@ -203,9 +194,9 @@ def build_risk_over_time(flights: list[FlightDist], cfg: Config) -> go.Figure:
                                  line=dict(color=color)), row=2, col=1)
     for val, col in [(ct, "#feb24c"), (wt, "#fd8d3c"), (dg, "#d7191c")]:
         fig.add_hline(y=val, line=dict(color=col, dash="dash", width=1), row=1, col=1)
-    fig.update_yaxes(title_text="Hangabstand [m]", rangemode="tozero", row=1, col=1)
-    fig.update_yaxes(title_text="% der Flugzeit", rangemode="tozero", row=2, col=1)
-    fig.update_xaxes(title_text="Flugdatum", row=2, col=1)
-    fig.update_layout(title="Risiko über Zeit — Hangabstand-Perzentile je Flug",
+    fig.update_yaxes(title_text="Terrain clearance [m]", rangemode="tozero", row=1, col=1)
+    fig.update_yaxes(title_text="% of flight time", rangemode="tozero", row=2, col=1)
+    fig.update_xaxes(title_text="Flight date", row=2, col=1)
+    fig.update_layout(title="Risk over time — terrain-clearance percentiles per flight",
                       hovermode="x unified", margin=dict(l=60, r=20, t=70, b=40))
     return fig
