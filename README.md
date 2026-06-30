@@ -11,6 +11,9 @@ high-resolution swisstopo topography:
 
 All geo/weather data is fetched **at runtime** from open sources (nothing large in the repo).
 
+📖 **Documentation site (English / Deutsch):** <https://benjamin-loeffel.github.io/paragliding-tools/> —
+the full, illustrated walkthrough with a language switcher (built for flight-school readers).
+
 ---
 
 ## Terrain clearance
@@ -31,7 +34,7 @@ Produces interactive HTML that can be opened offline: map (track coloured by cle
 with flight track, barogram with uncertainty band, clearance distribution.
 **Example outputs:** [`examples/output/terrainclearance/`](examples/output/terrainclearance/)
 (interactive `…_map.html` + 3D/comparison PNGs + `risk_over_time.png`) · **Details & methodology:**
-[`docs/terrainclearance.md`](docs/terrainclearance.md).
+[docs site → Terrain clearance](https://benjamin-loeffel.github.io/paragliding-tools/terrain-clearance/).
 
 ## Thermal & meteo forecast
 
@@ -97,6 +100,7 @@ src/thermalmodel/              Thermal modelling (+ validation/)
 meteo/                         Payerne radiosonde (data source for phase B)
 examples/data/                 Example inputs (5 tracks + domain KML)
 examples/output/               curated example results
-docs/                          Methodology (terrainclearance.md) + ADR journal
+docs/                          MkDocs site sources (EN + .de) + German ADR journal
+mkdocs.yml / .github/          docs-site build → GitHub Pages
 tests/                         pytest suite
 ```

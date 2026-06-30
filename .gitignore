@@ -26,3 +26,7 @@ next.md
 .claude/*.lock
 # persönliches Agent-Memory (Personenbezug) — nicht öffentlich (vgl. ADR-0033)
 .claude/agent-memory/
+
+# MkDocs (Doku-Site) — Build-Artefakte
+/site/
+docs/assets/

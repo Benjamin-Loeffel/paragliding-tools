@@ -1,0 +1,84 @@
+site_name: paragliding-tools
+site_description: Terrain-clearance analysis and solar-driven thermal modelling for paragliding (Switzerland)
+site_url: https://benjamin-loeffel.github.io/paragliding-tools/
+repo_url: https://github.com/Benjamin-Loeffel/paragliding-tools
+repo_name: Benjamin-Loeffel/paragliding-tools
+docs_dir: docs
+copyright: >-
+  Code: Apache-2.0 · Docs: CC BY 4.0 · Data: ©swisstopo / MeteoSchweiz / BAFU·WSL /
+  Open-Meteo / DWD / Copernicus — see Background
+
+# Not part of the docs site (kept in the repo): the German ADR journal + repo-only files.
+exclude_docs: |
+  README.md
+  thermalmodel-journal.md
+  wolkenabstaende-flowchart.md
+
+theme:
+  name: material
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+  palette:
+    - scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          name: English
+          default: true
+          build: true
+        - locale: de
+          name: Deutsch
+          build: true
+          nav_translations:
+            Overview: Überblick
+            Terrain clearance: Hangabstand
+            Thermals step by step: Thermik Schritt für Schritt
+            Payerne sounding: Payerne-Sondierung
+            Examples: Beispiele
+            Background: Hintergrund
+
+nav:
+  - Overview: index.md
+  - Terrain clearance: terrain-clearance.md
+  - Thermals step by step: thermal-step-by-step.md
+  - Payerne sounding: payerne.md
+  - Examples: examples.md
+  - Background: background.md
