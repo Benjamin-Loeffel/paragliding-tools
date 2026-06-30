@@ -78,9 +78,9 @@ flowchart TD
     A8 --> D0["D0: validiertes Quellfeld"]
     D0 --> B["B: Sondierung -> z_i(t)/w*/Decke"]
     B --> C["C: Talwind + ICON-Windfeld"]
-    C --> D1["D1: zweiphasige Plume: gelaendefolgend -> Abloesung -> freie Drift"]
-    D1 --> DT["Zeitaufgeloeste Drifts (11/13/15/18 h)"]
-    DT --> VAL["Validierung (IGC-Steigfluege + kk7) / XC-Potenzial / Tagesverlauf"]
+    C --> D1["D1: zweiphasige Plume: geländefolgend -> Ablösung -> freie Drift"]
+    D1 --> DT["Zeitaufgelöste Drifts (11/13/15/18 h)"]
+    DT --> VAL["Validierung (IGC-Steigflüge + kk7) / XC-Potenzial / Tagesverlauf"]
 ```
 
 | Phase | Modul | Inhalt |
@@ -140,11 +140,11 @@ Zu den Ausgaben gehören: `qh_*` (Q_H-Wärmebilder), `energy_3d*.html`, `d0_ther
 
 ```mermaid
 flowchart TD
-    ZI["z_i ist der robuste Praediktor (nicht w*)"]
-    TERRAIN["Gelaende steuert den ORT (zeitinvariant)"]
-    TIME["Tageszeit steuert Staerke/Decke/Drift"]
+    ZI["z_i ist der robuste Prädiktor (nicht w*)"]
+    TERRAIN["Gelände steuert den ORT (zeitinvariant)"]
+    TIME["Tageszeit steuert Stärke/Decke/Drift"]
     REJECT["Per Kreuzvalidierung verworfen: Kanten-Term & Lee-/Luv-Term"]
-    OVERFIT["Sie ueberfitten; kk7 wirkt als Waechter"]
+    OVERFIT["Sie überfitten; kk7 wirkt als Wächter"]
 
     ZI --> TIME
     TERRAIN --> TIME
