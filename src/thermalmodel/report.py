@@ -164,6 +164,58 @@ def build_energy_3d(grid: Grid, mask, dtm, energy, hotspots, path, title,
     return fig
 
 
+def build_energy_3d_timeslider(grid: Grid, mask, dtm, fields, path, title,
+                               colorbar="Energy input [Wh/m²]", colorscale="Inferno",
+                               cmax=None, stride=2):
+    """3D-Relief mit kumuliertem Q_H-Energieeintrag drapiert + ZEIT-SLIDER über die
+    Tageszeit-Stützstellen (11/13/15/18 h).
+
+    fields: [(Stunde, Feld[ny,nx]), …] kumulierter Energieeintrag je Cutoff.
+    Die Relief-Geometrie ist STATISCH (Basis-Trace 0); die Frames updaten NUR `surfacecolor`
+    (kein Geometrie-Bloat — wie beim Plume-Slider). `stride` dünnt das Mesh fürs Web aus.
+    Ein gemeinsames `cmax` (von aussen vorgegeben) macht ideal- vs. real-Slider direkt
+    vergleichbar (real wirkt dunkler = Wolkenverlust sichtbar)."""
+    import plotly.graph_objects as go
+
+    z = np.where(mask, dtm, np.nan).astype(float)[::stride, ::stride]
+    xs = ((np.arange(grid.nx) + 0.5) * grid.res)[::stride]
+    ys = ((grid.ny - np.arange(grid.ny) - 0.5) * grid.res)[::stride]
+    cols = [(int(h), np.where(mask, f, np.nan).astype(float)[::stride, ::stride])
+            for h, f in sorted(fields)]
+    if cmax is None:
+        cmax = max(float(np.nanmax(c)) for _, c in cols)
+    hours = [h for h, _ in cols]
+    init = min(range(len(hours)), key=lambda i: abs(hours[i] - 15))   # bei ~15 h starten (Story-konsistent)
+
+    def surface(col, with_geom):
+        kw = dict(surfacecolor=col, colorscale=colorscale, cmin=0.0, cmax=cmax,
+                  colorbar=dict(title=colorbar), hoverinfo="skip",
+                  lighting=dict(ambient=0.65, diffuse=0.6, specular=0.1))
+        if with_geom:                                   # nur der Basis-Trace trägt die Geometrie
+            kw.update(x=xs, y=ys, z=z)
+        return go.Surface(**kw)
+
+    frames = [go.Frame(data=[surface(col, with_geom=False)], name=f"{h:02d}", traces=[0])
+              for h, col in cols]
+    fig = go.Figure(data=[surface(cols[init][1], with_geom=True)], frames=frames)
+    steps = [dict(method="animate", label=f"{h:02d}:00",
+                  args=[[f"{h:02d}"], dict(mode="immediate", frame=dict(duration=0, redraw=True),
+                                           transition=dict(duration=0))]) for h, _ in cols]
+    fig.update_layout(
+        title=title, margin=dict(l=0, r=0, t=40, b=0),
+        sliders=[dict(active=init, currentvalue=dict(prefix="Energy accumulated until "),
+                      pad=dict(t=40), steps=steps)],
+        scene=dict(xaxis_title="East [m]", yaxis_title="North [m]",
+                   zaxis_title="Altitude [m a.s.l.]", aspectmode="data"))
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.write_html(str(path), include_plotlyjs=True)
+    try:                                                # statisches PNG (Initialframe ~15 h) fürs README
+        fig.write_image(str(Path(path).with_suffix(".png")), width=1500, height=1000, scale=2)
+    except Exception:
+        pass
+    return fig
+
+
 def plot_cumulative_panels_png(grid: Grid, mask, dtm, fields, path,
                                suptitle="Cumulative Q_H energy input over the day",
                                unit="Energy input [Wh/m²]"):

@@ -25,14 +25,20 @@ twilight colour wheel (N→E→S→W→N).
 
 **3 · Land cover on the relief.** Conifer forest, alpine meadow and bare rock turn sunlight into
 sensible heat very differently (albedo + heat fraction `f_H`). This bridges pure geometry to the real
-surface.
+surface. Interactive — rotate and zoom the land-cover classes draped on the 3D relief:
 
-![Land cover on the relief](assets/thermalmodel/landcover_3d.png)
+<iframe src="../assets/thermalmodel/landcover_3d.html" title="Land cover draped on the 3D relief" width="100%" height="560" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
 
 **4 · Ideal heat input.** Clear-sky irradiance × surface → sensible heat flux `Q_H`, the thermal
 driver, for a hypothetical cloud-free day. Hotspots (cyan) mark where the most energy goes in.
 
 ![Ideal Q_H heat-flux map](assets/thermalmodel/qh_ideal_daymax.png)
+
+The map above is the *peak* flux (instantaneous, W/m²). The interactive view below shows how the
+*energy* accumulates through the day (Wh/m², cumulative) — drag the slider over the 11/13/15/18 h
+support points. This is the **ideal**, clear-sky daily cycle:
+
+<iframe src="../assets/thermalmodel/energy_3d_ideal_slider.html" title="Ideal cumulative Q_H energy over the day (time slider)" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
 
 **5 · Real heat input = clouds + vegetation.** ICON-CH cloud attenuation and the land-cover
 albedo/`f_H` turn the *ideal* field into the *real* one; the difference is the cloud loss.
@@ -41,18 +47,25 @@ albedo/`f_H` turn the *ideal* field into the *real* one; the difference is the c
 |---|---|
 | ![Real Q_H](assets/thermalmodel/qh_real_daymax.png) | ![Cloud loss](assets/thermalmodel/qh_diff_energy.png) |
 
+The **real** daily cycle below uses *the same colour scale as the ideal slider above*, so the gap you
+see *is* the cloud loss. Drag the slider to watch the cloud-damped energy build up:
+
+<iframe src="../assets/thermalmodel/energy_3d_real_slider.html" title="Real cumulative Q_H energy over the day, ICON clouds (time slider)" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+
 **6 · Wind + thermals → drifting plumes.** The ICON wind field (several heights) plus the buoyancy
 (`w*`/`z_i`) advect the rising columns — thermals don't go straight up, they drift and shear with height.
 
-![ICON wind traces](assets/thermalmodel/wind_traces_13h.png)
+![ICON wind traces ≈15:00](assets/thermalmodel/wind_traces_15h.png)
 
 | thermal drift field 15:00 | drifting plumes over the relief (≈15:00) |
 |---|---|
 | ![Drift field 15:00](assets/thermalmodel/drift_15h_grid.png) | ![Drifting plumes](assets/thermalmodel/d1_plumes_grid_3d.png) |
 
-→ interactive, time-resolved 3D (slider 11/13/15/18 h), embedded here:
+**Everything combined.** The grid below releases one plume from every ~300 m cell, so terrain, land
+cover, cloud-damped heating, buoyancy (`w*`/`z_i`) and the ICON wind field all act at once — this is
+where the whole chain becomes visible. Interactive, time-resolved 3D (slider 11/13/15/18 h):
 
-<iframe src="../assets/thermalmodel/d1_plumes_hotspots_3d.html" title="Drifting thermal plumes (time slider)" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+<iframe src="../assets/thermalmodel/d1_plumes_grid_3d.html" title="Drifting thermal plumes — 300 m grid, time slider" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
 
 The remainder of this README is the formal pipeline, data sources and findings.
 

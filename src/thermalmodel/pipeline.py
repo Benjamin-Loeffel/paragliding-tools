@@ -20,9 +20,10 @@ from .irradiance import compute_clearsky_irradiance
 from .buoyancy import thermal_source_field
 from .landcover import classify
 from .nwp import fetch_cloud_attenuation
-from .report import (build_cumulative_energy_3d_files, build_energy_3d, plot_attenuation_timeseries,
-                     plot_cumulative_panels_png, plot_field_png, plot_hotspot_map_html,
-                     plot_relief_png, plot_aspect_slope_png, plot_landcover_3d, write_geotiffs)
+from .report import (build_cumulative_energy_3d_files, build_energy_3d, build_energy_3d_timeslider,
+                     plot_attenuation_timeseries, plot_cumulative_panels_png, plot_field_png,
+                     plot_hotspot_map_html, plot_relief_png, plot_aspect_slope_png,
+                     plot_landcover_3d, write_geotiffs)
 from .reproject import lv95_to_wgs84
 from .terrain_derivs import load_terrain
 
@@ -95,6 +96,11 @@ def run_phase_a(cfg: ThermalConfig) -> dict:
         grid, mask, terrain.dtm, cum, out, f"Q_H energy input (ideal, {cfg.date})")
     for h, f in cum:
         grid.to_geotiff(np.where(mask, f, np.nan), out / f"qh_ideal_energy_bis{int(h):02d}h.tif")
+    # Slider-3D des kumulierten Energieeintrags (ideal). Gemeinsames cmax (= ideales Tagestotal)
+    # auch für den Real-Slider → ideal vs. real direkt vergleichbar (real dunkler = Wolkenverlust).
+    emax = max(float(np.nanmax(np.where(mask, f, np.nan))) for _, f in cum)
+    build_energy_3d_timeslider(grid, mask, terrain.dtm, cum, out / "energy_3d_ideal_slider.html",
+                               f"Ideal Q_H energy input over the day — {cfg.date}", cmax=emax)
 
     # --- A5b: reales (wolkengedämpftes) Wärmebild via ICON-CH1 (Open-Meteo) ---
     real = {}
@@ -121,6 +127,10 @@ def run_phase_a(cfg: ThermalConfig) -> dict:
         real["cum_png"] = plot_cumulative_panels_png(
             grid, mask, terrain.dtm, cum_real, out / "energy_cumulative_real_panels.png",
             f"Kumulierter realer Energieeintrag Q_H (ICON-Wolken) — {cfg.date}")
+        build_energy_3d_timeslider(grid, mask, terrain.dtm, cum_real,
+                                   out / "energy_3d_real_slider.html",
+                                   f"Real Q_H energy input over the day (ICON clouds) — {cfg.date}",
+                                   cmax=emax)
         real.update(clouds=clouds, heat=heat_real)
         log.info("A5b real: Bewölkung Tagesmittel %.0f%%, Q_H-Energie ideal->real median %.0f->%.0f Wh/m²",
                  float(clouds.mean_cloud.mean()), float(np.median(heat.Q_H_energy[mask])),

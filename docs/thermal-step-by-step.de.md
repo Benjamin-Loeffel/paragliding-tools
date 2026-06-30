@@ -25,14 +25,20 @@ das Twilight-Farbrad (N→O→S→W→N).
 
 **3 · Bodenbedeckung auf dem Relief.** Nadelwald, Alpwiese und nackter Fels wandeln Sonnenlicht sehr
 unterschiedlich in fühlbare Wärme um (Albedo + Wärmeanteil `f_H`). Das schlägt die Brücke von reiner Geometrie zur realen
-Oberfläche.
+Oberfläche. Interaktiv — die Bodenbedeckungsklassen aufs 3D-Relief drapiert, drehen und zoomen:
 
-![Bodenbedeckung auf dem Relief](assets/thermalmodel/landcover_3d.png)
+<iframe src="../../assets/thermalmodel/landcover_3d.html" title="Bodenbedeckung aufs 3D-Relief drapiert" width="100%" height="560" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
 
 **4 · Idealer Wärmeeintrag.** Clear-Sky-Einstrahlung × Oberfläche → fühlbarer Wärmestrom `Q_H`, der Thermik-
 antrieb, für einen hypothetischen wolkenfreien Tag. Hotspots (cyan) markieren, wo die meiste Energie eingeht.
 
 ![Ideales Q_H-Wärmebild](assets/thermalmodel/qh_ideal_daymax.png)
+
+Die Karte oben ist der *Spitzen*-Wärmestrom (momentan, W/m²). Die interaktive Ansicht unten zeigt, wie sich
+die *Energie* über den Tag aufsummiert (Wh/m², kumulativ) — den Schieberegler über die Stützstellen
+11/13/15/18 h ziehen. Das ist der **ideale**, wolkenfreie Tagesgang:
+
+<iframe src="../../assets/thermalmodel/energy_3d_ideal_slider.html" title="Idealer kumulierter Q_H-Energieeintrag über den Tag (Zeitschieber)" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
 
 **5 · Realer Wärmeeintrag = Wolken + Vegetation.** Die ICON-CH-Wolkendämpfung und die Landcover-
 Albedo/`f_H` machen aus dem *idealen* Feld das *reale*; die Differenz ist der Wolkenverlust.
@@ -41,18 +47,25 @@ Albedo/`f_H` machen aus dem *idealen* Feld das *reale*; die Differenz ist der Wo
 |---|---|
 | ![Reales Q_H](assets/thermalmodel/qh_real_daymax.png) | ![Wolkenverlust](assets/thermalmodel/qh_diff_energy.png) |
 
+Der **reale** Tagesgang unten nutzt *dieselbe Farbskala wie der ideale Schieberegler oben* — die Lücke,
+die man sieht, *ist* der Wolkenverlust. Den Schieberegler ziehen, um den wolkengedämpften Energieaufbau zu verfolgen:
+
+<iframe src="../../assets/thermalmodel/energy_3d_real_slider.html" title="Realer kumulierter Q_H-Energieeintrag über den Tag, ICON-Wolken (Zeitschieber)" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+
 **6 · Wind + Thermik → driftende Plumes.** Das ICON-Windfeld (mehrere Höhen) plus der Auftrieb
 (`w*`/`z_i`) advehieren die aufsteigenden Säulen — Thermik steigt nicht gerade nach oben, sie driftet und schert mit der Höhe.
 
-![ICON-Windspuren](assets/thermalmodel/wind_traces_13h.png)
+![ICON-Windspuren ≈15:00](assets/thermalmodel/wind_traces_15h.png)
 
 | Thermik-Driftfeld 15:00 | driftende Plumes über dem Relief (≈15:00) |
 |---|---|
 | ![Driftfeld 15:00](assets/thermalmodel/drift_15h_grid.png) | ![Driftende Plumes](assets/thermalmodel/d1_plumes_grid_3d.png) |
 
-→ interaktives, zeitaufgelöstes 3D (Schieberegler 11/13/15/18 h), hier eingebettet:
+**Alles kombiniert.** Das Netz unten lässt aus jeder ~300-m-Zelle eine Plume los, sodass Gelände,
+Bodenbedeckung, wolkengedämpfte Erwärmung, Auftrieb (`w*`/`z_i`) und das ICON-Windfeld gleichzeitig
+wirken — hier wird die ganze Kette sichtbar. Interaktives, zeitaufgelöstes 3D (Schieberegler 11/13/15/18 h):
 
-<iframe src="../../assets/thermalmodel/d1_plumes_hotspots_3d.html" title="Driftende Thermiksäulen (Zeitschieber)" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+<iframe src="../../assets/thermalmodel/d1_plumes_grid_3d.html" title="Driftende Thermiksäulen — 300-m-Netz, Zeitschieber" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
 
 Der Rest dieses README ist die formale Pipeline, die Datenquellen und die Befunde.
 

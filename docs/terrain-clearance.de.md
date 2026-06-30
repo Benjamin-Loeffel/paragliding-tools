@@ -69,7 +69,7 @@ erforderlich.)
 | `*_3d.html` | Interaktiver **3D-Plot**: mattes, dunkles Hillshade-Relief + drehbare Flugspur, eingefärbt nach Hangabstand; MC-Band im Hover. |
 | `*_barogram.html` | Höhenprofil (Flughöhe / Gelände / Oberfläche) + Hangabstand-über-Zeit mit Schwellen, Ereignissen und **Unsicherheitsband** (p05–p95). |
 | `*_clearance_kde.html` | **Zeitverteilung** über den Hangabstand: Dichte + **kumulativ** ("% der Zeit unter X m"), Gelände und Wald. |
-| `aggregate_clearance_kde.html` | **Aggregat über mehrere Flüge** (Dichte + kumulativ; pro Flug + Mittel + zeitgewichtetes Total), normiert auf die Flugdauer. |
+| `aggregate_clearance_kde.html` | **Aggregat über mehrere Flüge** (Dichte + kumulativ; eine Kurve pro Flug), normiert auf die Flugdauer. |
 | `risk_over_time.html` | **Risiko über die Zeit**: Hangabstands-Perzentile (p05/p10/p25/Median) + Zeitanteil unter den Schwellen pro Flug, chronologisch. |
 | `*_points.csv` | Pro Fix alle Werte inkl. MC-Band (Mittel/p05/p95/min/max). |
 | `*_events.csv` | Kritische Momente: Zeit, Ort, Stufe, Phase (Flug/Landeanflug), Hangabstände inkl. p05/p95. |
@@ -79,12 +79,25 @@ Alle HTML-Dateien sind **eigenständig** (Plotly inline) und können offline ge�
 
 ---
 
-## Interaktives Beispiel
+## Interaktive Beispiele
 
-Eine der self-contained Ausgaben — die Flugspur nach 3D-Hangabstand eingefärbt
-(Hover für Werte, kritische Stellen markiert); schwenken & zoomen:
+Zwei reale Vergleichsflüge im Berner Oberland als self-contained 3D-Plots — das matte, dunkle
+Hillshade-Relief plus die drehbare Flugspur, eingefärbt rot→grün nach 3D-Hangabstand
+(Hover zeigt das Monte-Carlo-Band). Drehen, schwenken & zoomen.
 
-<iframe src="../../assets/terrainclearance/2026-06-25_66km_map.html" title="Interaktive Hangabstand-Karte" width="100%" height="560" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+**25. Juni, 66 km** — ein fordernder Tag: 34 kritische Momente, geringster Abstand ≈ 22 m.
+
+<iframe src="../../assets/terrainclearance/2026-06-25_66km_3d.html" title="3D-Hangabstand — 25. Juni, 66 km" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+
+**26. Juni, 60 km** — ein ruhigerer Flug: nur 3 kritische Momente, geringster Abstand ≈ 28 m.
+
+<iframe src="../../assets/terrainclearance/2026-06-26_60km_3d.html" title="3D-Hangabstand — 26. Juni, 60 km" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+
+Wie vergleichen sich die beiden? Das Aggregat stellt die **Zeit-im-Hangabstand** beider Flüge
+nebeneinander (Dichte + kumulativ „% der Zeit unter X m"), jeweils auf die Flugdauer normiert,
+damit der längere Flug nicht dominiert:
+
+<iframe src="../../assets/terrainclearance/aggregate_clearance_kde.html" title="Aggregat-Hangabstandsverteilung — die zwei Vergleichsflüge" width="100%" height="560" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
 
 ## Pipeline
 

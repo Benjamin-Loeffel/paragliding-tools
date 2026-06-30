@@ -68,7 +68,7 @@ as wheels. (`kaleido` is only needed for static PNG exports and is not required.
 | `*_3d.html` | Interactive **3D plot**: matte, dark hillshade relief + rotatable flight track, colored by clearance; MC band in the hover. |
 | `*_barogram.html` | Altitude profile (flight altitude / terrain / surface) + clearance-over-time with thresholds, events and **uncertainty band** (p05–p95). |
 | `*_clearance_kde.html` | **Time distribution** over terrain clearance: density + **cumulative** ("% of time below X m"), terrain and forest. |
-| `aggregate_clearance_kde.html` | **Multi-flight aggregate** (density + cumulative; per flight + mean + time-weighted total), normalized to flight duration. |
+| `aggregate_clearance_kde.html` | **Multi-flight aggregate** (density + cumulative; one curve per flight), normalized to flight duration. |
 | `risk_over_time.html` | **Risk over time**: terrain-clearance percentiles (p05/p10/p25/median) + share of time below thresholds per flight, chronological. |
 | `*_points.csv` | Per fix all values incl. MC band (mean/p05/p95/min/max). |
 | `*_events.csv` | Critical moments: time, location, level, phase (flight/landing approach), clearances incl. p05/p95. |
@@ -78,12 +78,25 @@ All HTML files are **self-contained** (plotly inline) and can be opened offline.
 
 ---
 
-## Interactive example
+## Interactive examples
 
-One of the self-contained outputs — the flight track coloured by 3D terrain clearance
-(hover for values, critical points marked); pan & zoom:
+Two real comparison flights in the Bernese Oberland as self-contained 3D plots — the matte, dark
+hillshade relief plus the rotatable flight track, coloured red→green by 3D terrain clearance
+(hover shows the Monte-Carlo band). Rotate, pan & zoom.
 
-<iframe src="../assets/terrainclearance/2026-06-25_66km_map.html" title="Interactive terrain-clearance map" width="100%" height="560" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+**25 June, 66 km** — a committing day: 34 critical moments, closest approach ≈ 22 m.
+
+<iframe src="../assets/terrainclearance/2026-06-25_66km_3d.html" title="3D terrain clearance — 25 June, 66 km" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+
+**26 June, 60 km** — a calmer flight: only 3 critical moments, closest ≈ 28 m.
+
+<iframe src="../assets/terrainclearance/2026-06-26_60km_3d.html" title="3D terrain clearance — 26 June, 60 km" width="100%" height="600" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
+
+How do the two compare? The aggregate puts both flights' **time-in-clearance** side by side
+(density + cumulative "% of time below X m"), each normalised to flight duration so the longer
+flight doesn't dominate:
+
+<iframe src="../assets/terrainclearance/aggregate_clearance_kde.html" title="Aggregate terrain-clearance distribution — the two comparison flights" width="100%" height="560" loading="lazy" style="border:1px solid var(--md-default-fg-color--lightest);border-radius:.2rem"></iframe>
 
 ## Pipeline
 
