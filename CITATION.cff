@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+title: "paragliding-tools: terrain-clearance analysis and solar-driven thermal modelling"
+message: "If you use this software or build on its methods/ideas, please cite it and declare the use."
+type: software
+authors:
+  - family-names: Loeffel
+    given-names: Benjamin
+repository-code: "https://github.com/Benjamin-Loeffel/paragliding-tools"
+abstract: >-
+  Open tooling for two paragliding use cases in Switzerland: (1) minimal 3D terrain clearance
+  for IGC flight tracks using swisstopo swissALTI3D/swissSURFACE3D, and (2) solar-driven thermal
+  modelling (irradiance -> sensible heat flux -> hotspots, boundary-layer w*/z_i, drifting plumes),
+  validated against own flights and thermal.kk7.ch. Data (swisstopo, BAFU/WSL, MeteoSwiss, Open-Meteo/
+  DWD/ECMWF) is fetched at runtime under the respective open licences.
+keywords:
+  - paragliding
+  - thermals
+  - terrain clearance
+  - swissALTI3D
+  - boundary layer
+  - ICON
+license: Apache-2.0

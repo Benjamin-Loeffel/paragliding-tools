@@ -1,0 +1,28 @@
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.egg-info/
+
+# Projekt-Artefakte (zur Laufzeit erzeugt/geholt) — nur Wurzel, NICHT examples/output/
+/cache/
+/output/
+
+# Persönliche / lokale Daten — NICHT im öffentlichen Repo
+# Optionaler lokaler Eingabe-Ordner für eigene Tracks; Demo-Tracks liegen in examples/data/igc/.
+# Das Projekt referenziert source/ nicht mehr (Default --igc = examples/data/igc).
+source/
+# lokale Sondierungs-Snapshots (MeteoSchweiz zur Laufzeit holen)
+meteo/archive/
+meteo/pdf_archive/
+# lokale Editor-Konfig / persönliche Notiz
+*.code-workspace
+next.md
+
+# Claude Code: Runtime/persönlich
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/*.lock
+# persönliches Agent-Memory (Personenbezug) — nicht öffentlich (vgl. ADR-0033)
+.claude/agent-memory/

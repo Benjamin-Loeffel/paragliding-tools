@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paragliding-tools"
+version = "0.1.0"
+description = "Terrain-clearance analysis and solar-driven thermal modelling for paragliding (Switzerland)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Benjamin Loeffel" }]
+keywords = ["paragliding", "thermals", "terrain", "swissALTI3D", "boundary-layer", "ICON"]
+dependencies = [
+  "numpy", "scipy", "pandas", "rasterio", "pyproj",
+  "plotly", "requests", "aerofiles", "python-dateutil", "tzdata",
+]
+
+[project.optional-dependencies]
+# Thermik-Modellierung (thermalmodel): zusätzliche wissenschaftliche Pakete
+thermal = ["pvlib", "metpy", "scikit-image", "shapely", "matplotlib"]
+# Payerne-Radiosonde / Emagramm (meteo)
+meteo = ["metpy", "matplotlib"]
+# Entwicklung + statischer PNG-Export der Plots (--png)
+dev = ["pytest", "kaleido"]
+
+[project.urls]
+Homepage = "https://github.com/Benjamin-Loeffel/paragliding-tools"
+Documentation = "https://github.com/Benjamin-Loeffel/paragliding-tools/tree/main/docs"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["terrainclearance*", "thermalmodel*"]
