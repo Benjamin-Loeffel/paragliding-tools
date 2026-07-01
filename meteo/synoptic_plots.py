@@ -96,6 +96,104 @@ def plot_ch_overview(syn, path, title: str):
     return path
 
 
+def _daytime_idx(syn, h0: int = 6, h1: int = 21) -> np.ndarray:
+    hrs = np.array([t.hour for t in syn.times])
+    idx = np.where((hrs >= h0) & (hrs <= h1))[0]
+    return idx if idx.size else np.arange(len(syn.times))
+
+
+def _slider(steps_labels, active, prefix):
+    steps = [dict(method="animate", label=lbl,
+                  args=[[lbl], dict(mode="immediate", frame=dict(duration=0, redraw=True),
+                                    transition=dict(duration=0))]) for lbl in steps_labels]
+    return [dict(active=active, currentvalue=dict(prefix=prefix), pad=dict(t=45), steps=steps)]
+
+
+def build_ch_slider(syn, key: str, path, title: str, colorscale: str, unit: str,
+                    cmin: float = 0.0, cmax: float | None = None):
+    """Interaktive CH-Karte eines Skalarfelds (Open-Meteo-Punkte) mit ZEIT-SLIDER (stündlich).
+    Marker nach Wert gefärbt; Frames updaten nur Farbe+Hover (leicht). Für Niederschlag & Sonne."""
+    import plotly.graph_objects as go
+    lon, lat = syn.ch["lon"], syn.ch["lat"]
+    field = syn.ch[key]                                   # [npts, nh]
+    idxs = _daytime_idx(syn)
+    if cmax is None:
+        cmax = float(np.nanpercentile(field[:, idxs], 98)) or 1.0
+    labels = [f"{syn.times[i].hour:02d}:00" for i in idxs]
+    means = [np.nanmean(field[:, i]) for i in idxs]
+    init = int(np.nanargmax(means)) if np.isfinite(means).any() else 0   # bei der „aktivsten" Stunde öffnen
+
+    def trace(i, with_geom):
+        c = field[:, i]
+        m = dict(size=13, color=c, colorscale=colorscale, cmin=cmin, cmax=cmax,
+                 colorbar=dict(title=unit), opacity=0.72)
+        kw = dict(marker=m, text=[f"{v:.1f} {unit}" for v in c], hoverinfo="text")
+        if with_geom:
+            kw.update(lon=lon, lat=lat, mode="markers")
+        return go.Scattermap(**kw)
+
+    frames = [go.Frame(data=[trace(i, False)], name=labels[k], traces=[0]) for k, i in enumerate(idxs)]
+    fig = go.Figure(data=[trace(idxs[init], True)], frames=frames)
+    fig.update_layout(
+        title=title, margin=dict(l=0, r=0, t=40, b=0),
+        map=dict(style="open-street-map", center=dict(lat=46.8, lon=8.2), zoom=6.2),
+        sliders=_slider(labels, init, "Zeit "))
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.write_html(str(path), include_plotlyjs=True)
+    return path
+
+
+CH_WIND_LEVELS = [
+    ("10 m",            "wind_speed_10m",    "wind_direction_10m"),
+    ("850 hPa (~1500 m)", "wind_speed_850hPa", "wind_direction_850hPa"),
+    ("700 hPa (~3000 m)", "wind_speed_700hPa", "wind_direction_700hPa"),
+    ("500 hPa (~5500 m)", "wind_speed_500hPa", "wind_direction_500hPa"),
+]
+
+
+def build_ch_wind_slider(syn, path, title: str, default_level: int = 2):
+    """Interaktive CH-Windkarte: Höhenstufen-DROPDOWN + ZEIT-SLIDER (stündlich).
+    Farbe = Windbetrag (cividis), Hover = Betrag + Richtung. Ein Trace je Stufe (Sichtbarkeit
+    via Dropdown), Frames updaten alle Stufen zeitgleich (nur Farbe+Hover)."""
+    import plotly.graph_objects as go
+    lon, lat = syn.ch["lon"], syn.ch["lat"]
+    idxs = _daytime_idx(syn)
+    labels = [f"{syn.times[i].hour:02d}:00" for i in idxs]
+    have = [lv for lv in CH_WIND_LEVELS if lv[1] in syn.ch and np.isfinite(syn.ch[lv[1]]).any()]
+    default_level = min(default_level, len(have) - 1)
+    cmax = max(float(np.nanpercentile(syn.ch[lv[1]][:, idxs], 98)) for lv in have) or 10.0
+    means = [np.nanmean(syn.ch[have[default_level][1]][:, i]) for i in idxs]
+    init = int(np.nanargmax(means)) if np.isfinite(means).any() else 0
+
+    def trace(spk, drk, i, visible, with_geom):
+        sp, dr = syn.ch[spk][:, i], syn.ch[drk][:, i]
+        m = dict(size=13, color=sp, colorscale="Cividis", cmin=0, cmax=cmax,
+                 colorbar=dict(title="km/h"), opacity=0.75)
+        kw = dict(marker=m, text=[f"{s:.0f} km/h aus {d:.0f}°" for s, d in zip(sp, dr)],
+                  hoverinfo="text")
+        if with_geom:
+            kw.update(lon=lon, lat=lat, mode="markers", visible=visible, name=None)
+        return go.Scattermap(**kw)
+
+    base = [trace(lv[1], lv[2], idxs[init], visible=(j == default_level), with_geom=True)
+            for j, lv in enumerate(have)]
+    frames = [go.Frame(name=labels[k],
+                       data=[trace(lv[1], lv[2], i, None, False) for lv in have],
+                       traces=list(range(len(have)))) for k, i in enumerate(idxs)]
+    buttons = [dict(label=lv[0], method="update",
+                    args=[{"visible": [j == jj for jj in range(len(have))]}]) for j, lv in enumerate(have)]
+    fig = go.Figure(data=base, frames=frames)
+    fig.update_layout(
+        title=title, margin=dict(l=0, r=0, t=40, b=0),
+        map=dict(style="open-street-map", center=dict(lat=46.8, lon=8.2), zoom=6.2),
+        updatemenus=[dict(buttons=buttons, x=0.02, y=0.98, xanchor="left", yanchor="top",
+                          bgcolor="white", active=default_level)],
+        sliders=_slider(labels, init, "Zeit "))
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.write_html(str(path), include_plotlyjs=True)
+    return path
+
+
 def plot_frutigen_radius(syn, path, title: str):
     plt = _use()
 

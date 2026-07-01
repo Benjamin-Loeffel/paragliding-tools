@@ -97,12 +97,13 @@ HOURLY_VARS = [
     "pressure_msl", "wind_speed_10m", "wind_gusts_10m", "wind_direction_10m",
     "freezing_level_height",
 ]
-# Schlankes Set fürs CH-weite Grid (nur, was Karten + Front-Bewertung brauchen).
-CH_VARS = ["precipitation", "weather_code", "cape", "cloud_cover",
+# Schlankes Set fürs CH-weite Grid (Karten + Front-Bewertung). shortwave_radiation = Sonneneinstrahlung.
+CH_VARS = ["precipitation", "weather_code", "cape", "cloud_cover", "shortwave_radiation",
            "wind_speed_10m", "wind_gusts_10m", "wind_direction_10m"]
 # Druckflächen-Winde (überregionaler/Höhenwind) — Modell icon_seamless (ICON-CH1/D2/EU), wie im Repo.
 UPPER_MODEL = "icon_seamless"
-UPPER_VARS = ["wind_speed_700hPa", "wind_direction_700hPa", "wind_speed_850hPa", "wind_direction_850hPa"]
+UPPER_VARS = ["wind_speed_850hPa", "wind_direction_850hPa", "wind_speed_700hPa",
+              "wind_direction_700hPa", "wind_speed_500hPa", "wind_direction_500hPa"]
 
 
 def _hourly(loc: dict, key: str, nh: int) -> np.ndarray:
