@@ -253,11 +253,9 @@ def main(argv=None) -> int:
     log.info("== Plots ==")
     interactive, static = [], []
     try:
-        SP.build_ch_slider(syn, "precipitation", out_dir / "ch_precip.html",
-                           f"Niederschlag CH — {date}", "YlGnBu", "mm/h")
+        SP.build_ch_precip(syn, out_dir / "ch_precip.html", date)
         interactive.append(("Niederschlag CH (Zeit-Slider)", "ch_precip.html"))
-        SP.build_ch_slider(syn, "shortwave_radiation", out_dir / "ch_solar.html",
-                           f"Sonneneinstrahlung CH — {date}", "Inferno", "W/m²")
+        SP.build_ch_solar(syn, out_dir / "ch_solar.html", date)
         interactive.append(("Sonneneinstrahlung CH (Zeit-Slider)", "ch_solar.html"))
         SP.build_ch_wind_slider(syn, out_dir / "ch_wind.html", f"Wind CH (Höhenstufen) — {date}")
         interactive.append(("Wind CH — Höhenstufen + Zeit-Slider", "ch_wind.html"))

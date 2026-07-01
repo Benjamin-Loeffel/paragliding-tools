@@ -109,86 +109,153 @@ def _slider(steps_labels, active, prefix):
     return [dict(active=active, currentvalue=dict(prefix=prefix), pad=dict(t=45), steps=steps)]
 
 
-def build_ch_slider(syn, key: str, path, title: str, colorscale: str, unit: str,
-                    cmin: float = 0.0, cmax: float | None = None):
-    """Interaktive CH-Karte eines Skalarfelds (Open-Meteo-Punkte) mit ZEIT-SLIDER (stündlich).
-    Marker nach Wert gefärbt; Frames updaten nur Farbe+Hover (leicht). Für Niederschlag & Sonne."""
-    import plotly.graph_objects as go
-    lon, lat = syn.ch["lon"], syn.ch["lat"]
-    field = syn.ch[key]                                   # [npts, nh]
-    idxs = _daytime_idx(syn)
-    if cmax is None:
-        cmax = float(np.nanpercentile(field[:, idxs], 98)) or 1.0
-    labels = [f"{syn.times[i].hour:02d}:00" for i in idxs]
-    means = [np.nanmean(field[:, i]) for i in idxs]
-    init = int(np.nanargmax(means)) if np.isfinite(means).any() else 0   # bei der „aktivsten" Stunde öffnen
-
-    def trace(i, with_geom):
-        c = field[:, i]
-        m = dict(size=13, color=c, colorscale=colorscale, cmin=cmin, cmax=cmax,
-                 colorbar=dict(title=unit), opacity=0.72)
-        kw = dict(marker=m, text=[f"{v:.1f} {unit}" for v in c], hoverinfo="text")
-        if with_geom:
-            kw.update(lon=lon, lat=lat, mode="markers")
-        return go.Scattermap(**kw)
-
-    frames = [go.Frame(data=[trace(i, False)], name=labels[k], traces=[0]) for k, i in enumerate(idxs)]
-    fig = go.Figure(data=[trace(idxs[init], True)], frames=frames)
-    fig.update_layout(
-        title=title, margin=dict(l=0, r=0, t=40, b=0),
-        map=dict(style="open-street-map", center=dict(lat=46.8, lon=8.2), zoom=6.2),
-        sliders=_slider(labels, init, "Zeit "))
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.write_html(str(path), include_plotlyjs=True)
-    return path
-
+# --- Farbskalen (Vorbild MeteoSchweiz-Radar) ---
+PRECIP_COLORSCALE = [                         # Radar-Skala mm/h; trocken = transparent
+    [0.00, "rgba(43,131,186,0.0)"], [0.03, "rgba(43,131,186,0.55)"],
+    [0.15, "#2b83ba"], [0.30, "#66c2a5"], [0.45, "#abdda4"],
+    [0.60, "#ffffbf"], [0.72, "#fdae61"], [0.85, "#d7191c"], [1.00, "#7b3294"],
+]
+PRECIP_ZMAX = 15.0                            # mm/h — feste Skala (tagesübergreifend vergleichbar)
+SOLAR_COLORSCALE = "Inferno"
+SOLAR_ZMAX = 1000.0                           # W/m²
+WIND_COLORSCALE = [                           # grün ruhig → gelb ~25 km/h (Schwelle) → rot ab ~60
+    [0.00, "#1a9850"], [0.20, "#66bd63"], [0.36, "#fee08b"],
+    [0.55, "#fdae61"], [0.75, "#f46d43"], [1.00, "#a50026"],
+]
+WIND_ZMAX = 70.0                              # km/h
 
 CH_WIND_LEVELS = [
-    ("10 m",            "wind_speed_10m",    "wind_direction_10m"),
+    ("10 m",              "wind_speed_10m",    "wind_direction_10m"),
     ("850 hPa (~1500 m)", "wind_speed_850hPa", "wind_direction_850hPa"),
     ("700 hPa (~3000 m)", "wind_speed_700hPa", "wind_direction_700hPa"),
     ("500 hPa (~5500 m)", "wind_speed_500hPa", "wind_direction_500hPa"),
 ]
 
 
-def build_ch_wind_slider(syn, path, title: str, default_level: int = 2):
-    """Interaktive CH-Windkarte: Höhenstufen-DROPDOWN + ZEIT-SLIDER (stündlich).
-    Farbe = Windbetrag (cividis), Hover = Betrag + Richtung. Ein Trace je Stufe (Sichtbarkeit
-    via Dropdown), Frames updaten alle Stufen zeitgleich (nur Farbe+Hover)."""
-    import plotly.graph_objects as go
+def _init_hour(syn, key, idxs):
+    means = [np.nanmean(syn.ch[key][:, i]) for i in idxs]
+    return int(np.nanargmax(means)) if np.isfinite(means).any() else 0
+
+
+def _cells_geojson(syn):
+    """Ein Rechteck-Polygon je CH-Gitterpunkt (für go.Choropleth). Gibt (geojson, locations)."""
+    h = S.CH_GRID_STEP_DEG / 2.0
     lon, lat = syn.ch["lon"], syn.ch["lat"]
+    feats, locs = [], []
+    for i in range(lon.size):
+        lo, la = float(lon[i]), float(lat[i])
+        feats.append({"type": "Feature", "id": i, "geometry": {"type": "Polygon", "coordinates": [[
+            [lo - h, la - h], [lo + h, la - h], [lo + h, la + h], [lo - h, la + h], [lo - h, la - h]]]}})
+        locs.append(i)
+    return {"type": "FeatureCollection", "features": feats}, locs
+
+
+def _geo_layout():
+    """Dunkle Schweiz-Silhouette mit Kantons-/See-Umrissen (Natural-Earth, kein WebGL, keine Tiles)."""
+    return dict(scope="europe", resolution=50, projection_type="mercator",
+                lonaxis=dict(range=[5.7, 10.7]), lataxis=dict(range=[45.7, 47.95]),
+                showcountries=True, countrycolor="rgb(235,235,235)", countrywidth=1.6,
+                showsubunits=True, subunitcolor="rgb(150,150,150)", subunitwidth=0.6,
+                showlakes=True, lakecolor="rgb(35,55,80)",
+                showland=True, landcolor="rgb(17,17,17)", showframe=False,
+                showcoastlines=False, bgcolor="rgba(0,0,0,0)")
+
+
+REF_POINTS = [   # (Name, lon, lat) — Orientierung auf der Karte; Frutigen hervorgehoben
+    ("Frutigen", S.FRUTIGEN_LON, S.FRUTIGEN_LAT), ("Bern", 7.44, 46.95),
+    ("Zürich", 8.54, 47.38), ("Genève", 6.14, 46.20), ("Lugano", 8.96, 46.00),
+    ("Interlaken", 7.87, 46.68), ("Chur", 9.53, 46.85),
+]
+
+
+def _reference_markers():
+    """Frutigen (magenta Stern) + einige Städte (Orientierung), als oberste Ebene."""
+    import plotly.graph_objects as go
+    names = [p[0] for p in REF_POINTS]
+    sizes = [11 if n == "Frutigen" else 5 for n in names]
+    colors = ["magenta" if n == "Frutigen" else "white" for n in names]
+    return go.Scattergeo(lon=[p[1] for p in REF_POINTS], lat=[p[2] for p in REF_POINTS],
+                         mode="markers+text", text=names, textposition="top center",
+                         textfont=dict(size=9, color="white"),
+                         marker=dict(size=sizes, color=colors, line=dict(width=0.5, color="black")),
+                         name="Orte", hoverinfo="text")
+
+
+def build_ch_slider(syn, key, path, title, colorscale, unit, zmax):
+    """CH-Karte eines Skalarfelds als gefüllte Gitterzellen (go.Choropleth auf geo) + ZEIT-SLIDER.
+    Self-contained (kein WebGL, keine Tiles); feste `zmax` → tagesübergreifend vergleichbar."""
+    import plotly.graph_objects as go
+    geojson, locs = _cells_geojson(syn)
+    field = np.nan_to_num(syn.ch[key], nan=0.0)
+    idxs = _daytime_idx(syn)
+    labels = [f"{syn.times[i].hour:02d}:00" for i in idxs]
+    init = _init_hour(syn, key, idxs)
+
+    def cho(i, base):
+        z = field[:, i]
+        kw = dict(locations=locs, z=z, featureidkey="id",
+                  text=[f"{v:.1f} {unit}" for v in z], hoverinfo="text")
+        if base:                       # Geometrie/Styling nur im Basis-Trace; Frames tragen nur z+Text
+            kw.update(geojson=geojson, colorscale=colorscale, zmin=0.0, zmax=zmax,
+                      marker_line_width=0, marker_opacity=0.6, colorbar=dict(title=unit))
+        return go.Choropleth(**kw)
+
+    frames = [go.Frame(data=[cho(i, False)], name=labels[k], traces=[0]) for k, i in enumerate(idxs)]
+    fig = go.Figure(data=[cho(idxs[init], True), _reference_markers()], frames=frames)
+    fig.update_layout(title=title, margin=dict(l=0, r=0, t=40, b=0),
+                      geo=_geo_layout(), paper_bgcolor="rgb(8,8,8)",
+                      font=dict(color="rgb(220,220,220)"), sliders=_slider(labels, init, "Zeit "))
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.write_html(str(path), include_plotlyjs=True)
+    return path
+
+
+def build_ch_precip(syn, path, date):
+    return build_ch_slider(syn, "precipitation", path, f"Niederschlag CH (mm/h) — {date}",
+                           PRECIP_COLORSCALE, "mm/h", PRECIP_ZMAX)
+
+
+def build_ch_solar(syn, path, date):
+    return build_ch_slider(syn, "shortwave_radiation", path, f"Sonneneinstrahlung CH — {date}",
+                           SOLAR_COLORSCALE, "W/m²", SOLAR_ZMAX)
+
+
+def build_ch_wind_slider(syn, path, title, default_level: int = 2):
+    """CH-Windkarte als gefüllte Gitterzellen (go.Choropleth): Höhenstufen-DROPDOWN + ZEIT-SLIDER.
+    Farbe = Windbetrag (grün ruhig → gelb ab ~25 km/h → rot); Hover = Betrag + Richtung."""
+    import plotly.graph_objects as go
+    geojson, locs = _cells_geojson(syn)
     idxs = _daytime_idx(syn)
     labels = [f"{syn.times[i].hour:02d}:00" for i in idxs]
     have = [lv for lv in CH_WIND_LEVELS if lv[1] in syn.ch and np.isfinite(syn.ch[lv[1]]).any()]
     default_level = min(default_level, len(have) - 1)
-    cmax = max(float(np.nanpercentile(syn.ch[lv[1]][:, idxs], 98)) for lv in have) or 10.0
-    means = [np.nanmean(syn.ch[have[default_level][1]][:, i]) for i in idxs]
-    init = int(np.nanargmax(means)) if np.isfinite(means).any() else 0
+    init = _init_hour(syn, have[default_level][1], idxs)
 
-    def trace(spk, drk, i, visible, with_geom):
-        sp, dr = syn.ch[spk][:, i], syn.ch[drk][:, i]
-        m = dict(size=13, color=sp, colorscale="Cividis", cmin=0, cmax=cmax,
-                 colorbar=dict(title="km/h"), opacity=0.75)
-        kw = dict(marker=m, text=[f"{s:.0f} km/h aus {d:.0f}°" for s, d in zip(sp, dr)],
-                  hoverinfo="text")
-        if with_geom:
-            kw.update(lon=lon, lat=lat, mode="markers", visible=visible, name=None)
-        return go.Scattermap(**kw)
+    def cho(spk, drk, i, base, visible=None):
+        sp = np.nan_to_num(syn.ch[spk][:, i], nan=0.0); dr = np.nan_to_num(syn.ch[drk][:, i], nan=0.0)
+        kw = dict(locations=locs, z=sp, featureidkey="id",
+                  text=[f"{s:.0f} km/h aus {d:.0f}°" for s, d in zip(sp, dr)], hoverinfo="text")
+        if base:                       # Geometrie/Styling nur im Basis-Trace; Frames tragen nur z+Text
+            kw.update(geojson=geojson, colorscale=WIND_COLORSCALE, zmin=0.0, zmax=WIND_ZMAX,
+                      marker_line_width=0, marker_opacity=0.6, colorbar=dict(title="km/h"))
+            if visible is not None:
+                kw["visible"] = visible
+        return go.Choropleth(**kw)
 
-    base = [trace(lv[1], lv[2], idxs[init], visible=(j == default_level), with_geom=True)
-            for j, lv in enumerate(have)]
-    frames = [go.Frame(name=labels[k],
-                       data=[trace(lv[1], lv[2], i, None, False) for lv in have],
+    base = [cho(lv[1], lv[2], idxs[init], True, visible=(j == default_level)) for j, lv in enumerate(have)]
+    base.append(_reference_markers())
+    frames = [go.Frame(name=labels[k], data=[cho(lv[1], lv[2], i, False) for lv in have],
                        traces=list(range(len(have)))) for k, i in enumerate(idxs)]
+    nvis = len(have)
     buttons = [dict(label=lv[0], method="update",
-                    args=[{"visible": [j == jj for jj in range(len(have))]}]) for j, lv in enumerate(have)]
+                    args=[{"visible": [j == jj for jj in range(nvis)] + [True]}])  # +Frutigen-Marker
+               for j, lv in enumerate(have)]
     fig = go.Figure(data=base, frames=frames)
-    fig.update_layout(
-        title=title, margin=dict(l=0, r=0, t=40, b=0),
-        map=dict(style="open-street-map", center=dict(lat=46.8, lon=8.2), zoom=6.2),
-        updatemenus=[dict(buttons=buttons, x=0.02, y=0.98, xanchor="left", yanchor="top",
-                          bgcolor="white", active=default_level)],
-        sliders=_slider(labels, init, "Zeit "))
+    fig.update_layout(title=title, margin=dict(l=0, r=0, t=40, b=0),
+                      geo=_geo_layout(), paper_bgcolor="rgb(8,8,8)", font=dict(color="rgb(220,220,220)"),
+                      updatemenus=[dict(buttons=buttons, x=0.01, y=0.99, xanchor="left",
+                                        yanchor="top", bgcolor="white", active=default_level)],
+                      sliders=_slider(labels, init, "Zeit "))
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(str(path), include_plotlyjs=True)
     return path
