@@ -220,9 +220,38 @@ def build_ch_solar(syn, path, date):
                            SOLAR_COLORSCALE, "W/m²", SOLAR_ZMAX)
 
 
+def _arrow_paths(lon, lat, u, v, step_deg=0.09, head=0.38):
+    """Downwind-Pfeile (Schaft + V-Spitze) als None-getrennte lon/lat-Listen für Scattergeo-lines.
+    u,v = Komponenten wohin (aus _uv_from_dir); feste Länge = Richtungsfeld; lon per cos(lat) korrigiert."""
+    alon, alat = [], []
+    for i in range(len(lon)):
+        sp = float(np.hypot(u[i], v[i]))
+        if not np.isfinite(sp) or sp < 1e-6:
+            continue
+        cs = max(np.cos(np.radians(lat[i])), 0.3)
+        dx, dy = u[i] / sp, v[i] / sp                          # Einheitsrichtung (wohin)
+        tlo = lon[i] + step_deg * dx / cs; tla = lat[i] + step_deg * dy      # Spitze
+        h = []
+        for ang in (2.618, -2.618):                            # ±150° → Pfeilspitze
+            ca, sa = np.cos(ang), np.sin(ang)
+            hx, hy = dx * ca - dy * sa, dx * sa + dy * ca
+            h.append((tlo + step_deg * head * hx / cs, tla + step_deg * head * hy))
+        alon += [float(lon[i]), tlo, h[0][0], tlo, h[1][0], None]
+        alat += [float(lat[i]), tla, h[0][1], tla, h[1][1], None]
+    return alon, alat
+
+
+def _wind_subsample(syn, stride=2):
+    """Jeder stride-te Gitterpunkt in beiden Richtungen (für ein lesbares Pfeilfeld)."""
+    nlat, nlon = syn.ch_lats.size, syn.ch_lons.size
+    keep = [ilat * nlon + ilon for ilat in range(0, nlat, stride) for ilon in range(0, nlon, stride)]
+    return np.array([k for k in keep if k < syn.ch["lon"].size], int)
+
+
 def build_ch_wind_slider(syn, path, title, default_level: int = 2):
-    """CH-Windkarte als gefüllte Gitterzellen (go.Choropleth): Höhenstufen-DROPDOWN + ZEIT-SLIDER.
-    Farbe = Windbetrag (grün ruhig → gelb ab ~25 km/h → rot); Hover = Betrag + Richtung."""
+    """CH-Windkarte: gefülltes Betragsfeld (go.Choropleth) + DOWNWIND-PFEILE (Richtung), mit
+    Höhenstufen-DROPDOWN + ZEIT-SLIDER. Farbe = Betrag (grün ruhig → gelb ~25 km/h → rot),
+    dunkle Pfeile = Strömungsrichtung (wie die wind_traces); Hover = Betrag + Richtung."""
     import plotly.graph_objects as go
     geojson, locs = _cells_geojson(syn)
     idxs = _daytime_idx(syn)
@@ -230,6 +259,9 @@ def build_ch_wind_slider(syn, path, title, default_level: int = 2):
     have = [lv for lv in CH_WIND_LEVELS if lv[1] in syn.ch and np.isfinite(syn.ch[lv[1]]).any()]
     default_level = min(default_level, len(have) - 1)
     init = _init_hour(syn, have[default_level][1], idxs)
+    sub = _wind_subsample(syn, stride=2)
+    slon, slat = syn.ch["lon"][sub], syn.ch["lat"][sub]
+    N = len(have)
 
     def cho(spk, drk, i, base, visible=None):
         sp = np.nan_to_num(syn.ch[spk][:, i], nan=0.0); dr = np.nan_to_num(syn.ch[drk][:, i], nan=0.0)
@@ -242,13 +274,27 @@ def build_ch_wind_slider(syn, path, title, default_level: int = 2):
                 kw["visible"] = visible
         return go.Choropleth(**kw)
 
+    def arr(spk, drk, i, base, visible=None):
+        sp = np.nan_to_num(syn.ch[spk][sub, i], nan=0.0); dr = np.nan_to_num(syn.ch[drk][sub, i], nan=0.0)
+        u, v = _uv_from_dir(sp, dr)
+        alon, alat = _arrow_paths(slon, slat, u, v)
+        kw = dict(lon=alon, lat=alat)
+        if base:
+            kw.update(mode="lines", line=dict(width=1.1, color="rgba(10,10,10,0.85)"),
+                      hoverinfo="skip", showlegend=False, visible=visible)
+        return go.Scattergeo(**kw)
+
     base = [cho(lv[1], lv[2], idxs[init], True, visible=(j == default_level)) for j, lv in enumerate(have)]
+    base += [arr(lv[1], lv[2], idxs[init], True, visible=(j == default_level)) for j, lv in enumerate(have)]
     base.append(_reference_markers())
-    frames = [go.Frame(name=labels[k], data=[cho(lv[1], lv[2], i, False) for lv in have],
-                       traces=list(range(len(have)))) for k, i in enumerate(idxs)]
-    nvis = len(have)
+    frames = [go.Frame(name=labels[k],
+                       data=[cho(lv[1], lv[2], i, False) for lv in have]
+                            + [arr(lv[1], lv[2], i, False) for lv in have],
+                       traces=list(range(2 * N))) for k, i in enumerate(idxs)]
     buttons = [dict(label=lv[0], method="update",
-                    args=[{"visible": [j == jj for jj in range(nvis)] + [True]}])  # +Frutigen-Marker
+                    args=[{"visible": [j == jj for jj in range(N)]       # Choropleth-Felder
+                                    + [j == jj for jj in range(N)]       # Pfeil-Overlays
+                                    + [True]}])                          # Orte
                for j, lv in enumerate(have)]
     fig = go.Figure(data=base, frames=frames)
     fig.update_layout(title=title, margin=dict(l=0, r=0, t=40, b=0),
