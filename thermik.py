@@ -107,7 +107,7 @@ def _site_table_md(rows) -> str:
 
 
 def build(date: str, out_root: str, cache: str, kml: str, resolution: float,
-          skip_plumes: bool, session) -> dict:
+          skip_plumes: bool, session, horizon_workers: int = 1) -> dict:
     from thermalmodel.config import ThermalConfig
     from thermalmodel.pipeline import run_phase_a
     from thermalmodel.boundarylayer import analyze_sounding, thermal_strength
@@ -120,7 +120,7 @@ def build(date: str, out_root: str, cache: str, kml: str, resolution: float,
     out_dir = Path(out_root) / date
     out_dir.mkdir(parents=True, exist_ok=True)
     cfg = ThermalConfig(kml_path=kml, resolution_m=resolution, date=date,
-                        cache_dir=Path(cache), output_dir=out_dir)
+                        cache_dir=Path(cache), output_dir=out_dir, horizon_workers=horizon_workers)
 
     log.info("== Phase A (Q_H, Hotspots, Wolken) für %s ==", date)
     res = run_phase_a(cfg)
@@ -244,6 +244,8 @@ def main(argv=None) -> int:
     ap.add_argument("--cache", default="cache")
     ap.add_argument("--kml", default="examples/data/domain_frutigen_wide.kml")
     ap.add_argument("--resolution", type=float, default=60.0)
+    ap.add_argument("--horizon-workers", type=int, default=1,
+                    help="Parallel-Prozesse für den Horizont (bei 20 m z. B. 6). 1 = seriell.")
     ap.add_argument("--skip-plumes", action="store_true", help="ohne die schweren 3D-Plume-Slider")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -254,7 +256,8 @@ def main(argv=None) -> int:
             pass
 
     session = requests.Session()
-    S = build(args.date, args.out, args.cache, args.kml, args.resolution, args.skip_plumes, session)
+    S = build(args.date, args.out, args.cache, args.kml, args.resolution, args.skip_plumes, session,
+              horizon_workers=args.horizon_workers)
     log.info("Fertig: %s → %s", args.date, Path(args.out) / args.date / "thermik.md")
     print(f"\n  Thermik-Prognose {args.date}: w* max {S['w_star_max_ms']} m/s, z_i {S['z_i_peak_amsl_m']} m, "
           f"XC {S['xc_max_pct']}%")

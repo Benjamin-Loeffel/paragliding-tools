@@ -23,38 +23,74 @@ def _shift(z: np.ndarray, dr: int, dc: int, fill: float) -> np.ndarray:
     return out
 
 
+def _clean(z: np.ndarray) -> np.ndarray:
+    zf = np.array(z, dtype=float)
+    if not np.isfinite(zf).all():
+        zf[~np.isfinite(zf)] = np.nanmean(zf)
+    return zf
+
+
+def _one_azimuth(zf: np.ndarray, a: float, res: float, step_m: float, max_steps: int) -> np.ndarray:
+    """Horizont-Erhebungswinkel [ny,nx] für EINEN Azimut (Ray-March). Pro Azimut unabhängig."""
+    ny, nx = zf.shape
+    dr_unit = -np.cos(a)   # Azimut 0=N -> Richtung -Row
+    dc_unit = np.sin(a)    # 90=O -> +Col
+    maxang = np.full((ny, nx), -np.inf, dtype=float)
+    last = (0, 0)
+    for k in range(1, max_steps + 1):
+        dist = k * step_m
+        dr = int(round(dist / res * dr_unit))
+        dc = int(round(dist / res * dc_unit))
+        if (dr, dc) == last:
+            continue
+        last = (dr, dc)
+        if abs(dr) >= ny and abs(dc) >= nx:
+            break
+        zs = _shift(zf, dr, dc, fill=-np.inf)
+        with np.errstate(invalid="ignore"):
+            ang = np.arctan2(zs - zf, dist)
+        np.maximum(maxang, np.where(np.isfinite(zs), ang, -np.inf), out=maxang)
+    return np.where(np.isfinite(maxang), np.maximum(maxang, 0.0), 0.0).astype(np.float32)
+
+
+def _svf(horizon: np.ndarray) -> np.ndarray:
+    # Isotrope SVF-Näherung (Dozier/Frew): 1 - mittlerer sin(Horizont)
+    return (1.0 - np.mean(np.sin(np.clip(horizon, 0.0, np.pi / 2)), axis=0)).astype(np.float32)
+
+
 def horizon_and_svf(z: np.ndarray, res: float, n_azimuth: int = 36,
                     max_steps: int = 600, step_m: float | None = None):
     """-> (horizon[n_az, ny, nx] Erhebungswinkel rad, azimuths rad, svf[ny,nx] 0..1)."""
     step_m = step_m or res
-    zf = np.array(z, dtype=float)
-    if not np.isfinite(zf).all():
-        zf[~np.isfinite(zf)] = np.nanmean(zf)
-    ny, nx = zf.shape
+    zf = _clean(z)
     azimuths = np.linspace(0.0, 2 * np.pi, n_azimuth, endpoint=False)  # 0=N, im Uhrzeigersinn
-    horizon = np.zeros((n_azimuth, ny, nx), dtype=np.float32)
-    for ai, a in enumerate(azimuths):
-        dr_unit = -np.cos(a)   # Azimut 0=N -> Richtung -Row
-        dc_unit = np.sin(a)    # 90=O -> +Col
-        maxang = np.full((ny, nx), -np.inf, dtype=float)
-        last = (0, 0)
-        for k in range(1, max_steps + 1):
-            dist = k * step_m
-            dr = int(round(dist / res * dr_unit))
-            dc = int(round(dist / res * dc_unit))
-            if (dr, dc) == last:
-                continue
-            last = (dr, dc)
-            if abs(dr) >= ny and abs(dc) >= nx:
-                break
-            zs = _shift(zf, dr, dc, fill=-np.inf)
-            with np.errstate(invalid="ignore"):
-                ang = np.arctan2(zs - zf, dist)
-            np.maximum(maxang, np.where(np.isfinite(zs), ang, -np.inf), out=maxang)
-        horizon[ai] = np.where(np.isfinite(maxang), np.maximum(maxang, 0.0), 0.0)
-    # Isotrope SVF-Näherung (Dozier/Frew): 1 - mittlerer sin(Horizont)
-    svf = 1.0 - np.mean(np.sin(np.clip(horizon, 0.0, np.pi / 2)), axis=0)
-    return horizon, azimuths, svf.astype(np.float32)
+    horizon = np.stack([_one_azimuth(zf, a, res, step_m, max_steps) for a in azimuths])
+    return horizon, azimuths, _svf(horizon)
+
+
+def _azimuth_chunk(args):
+    """Pool-Worker: Horizont für eine Teilmenge Azimute (modul-level → picklebar für spawn)."""
+    zf, res, azis, step_m, max_steps = args
+    return np.stack([_one_azimuth(zf, a, res, step_m, max_steps) for a in azis])
+
+
+def horizon_and_svf_parallel(z: np.ndarray, res: float, n_azimuth: int = 36,
+                             max_steps: int = 600, step_m: float | None = None, workers: int = 4):
+    """Wie horizon_and_svf, aber die (unabhängigen) Azimute auf `workers` Prozesse verteilt.
+
+    Der Horizont ist bei feiner Auflösung der Flaschenhals (O(Zellen × Azimute × Schritte));
+    Azimute sind vollständig unabhängig → sauber parallelisierbar. array_split liefert
+    zusammenhängende, aufsteigende Azimut-Blöcke, darum stimmt die Reihenfolge nach concatenate."""
+    from concurrent.futures import ProcessPoolExecutor
+    step_m = step_m or res
+    zf = _clean(z)
+    azimuths = np.linspace(0.0, 2 * np.pi, n_azimuth, endpoint=False)
+    chunks = [c for c in np.array_split(np.arange(n_azimuth), workers) if len(c)]
+    tasks = [(zf, res, azimuths[c], step_m, max_steps) for c in chunks]
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        parts = list(ex.map(_azimuth_chunk, tasks))
+    horizon = np.concatenate(parts, axis=0).astype(np.float32)
+    return horizon, azimuths, _svf(horizon)
 
 
 def sun_is_shadowed(horizon: np.ndarray, azimuths: np.ndarray,

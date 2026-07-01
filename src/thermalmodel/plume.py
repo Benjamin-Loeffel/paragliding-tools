@@ -280,11 +280,13 @@ def build_plume_3d_timeslider(grid, mask, dtm, tracks_by_hour, path, title):
     """3D-Relief + driftende Thermik-Säulen mit ZEIT-SLIDER (11/13/15/18 h).
     tracks_by_hour: {Stunde: [PlumeTrack,…]} — pro Uhrzeit ein Frame (Wind/w*/z_i tageszeitabhängig)."""
     import plotly.graph_objects as go
+    from .report import mesh_stride
 
     w, s, e, n = grid.bounds()
-    xs = (np.arange(grid.nx) + 0.5) * grid.res
-    ys = (grid.ny - np.arange(grid.ny) - 0.5) * grid.res
-    zsurf = np.where(mask, dtm, np.nan).astype(float)
+    st = mesh_stride(grid)                              # nur die Relieffläche ausdünnen; Plumes bleiben 1:1
+    xs = ((np.arange(grid.nx) + 0.5) * grid.res)[::st]
+    ys = ((grid.ny - np.arange(grid.ny) - 0.5) * grid.res)[::st]
+    zsurf = np.where(mask, dtm, np.nan).astype(float)[::st, ::st]
     surface = go.Surface(x=xs, y=ys, z=zsurf, colorscale="Greys", showscale=False, opacity=0.9,
                          hoverinfo="skip", lighting=dict(ambient=0.75, diffuse=0.5))
     hours = sorted(tracks_by_hour)

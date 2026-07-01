@@ -10,11 +10,20 @@ Je Zeitpunkt:
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 import numpy as np
 
 log = logging.getLogger(__name__)
+
+
+def _build_3d_timed(fn, grid, mask, dtm, by_hour, path, title):
+    """build_plume_3d_timeslider mit Timing + Dateigrössen-Log (3D-HTMLs sind der Grössen-Hotspot)."""
+    t = time.perf_counter()
+    fn(grid, mask, dtm, by_hour, path, title)
+    mb = Path(path).stat().st_size / 1048576 if Path(path).exists() else 0.0
+    log.info("  [t] %s: %.1f s -> %.0f MB", Path(path).name, time.perf_counter() - t, mb)
 
 
 def _nearest_step(times, hour):
@@ -72,6 +81,7 @@ def run_time_resolved(cfg, res, bl, vw, session=None):
         return run_plumes(seeds, bl, qh_t, grid, terr, cfg, valley=vw, wind_uv_fn=wind_fn,
                           band_scale=g, veg_edge=vege) if seeds else []
 
+    _t_loop = time.perf_counter()
     for h in cfg.cumulative_hours_drift:
         idx = _nearest_step(heat.times, h)
         qh_t = heat.Q_H[idx]
@@ -100,17 +110,23 @@ def run_time_resolved(cfg, res, bl, vw, session=None):
         plot_wind_traces_levels(grid, mask, dtm, gw, out / f"wind_traces_{h:02d}h.png",
                                 f"ICON wind traces {h:02d}:00 ({cfg.wind_model}) — {cfg.date}")
 
+    log.info("  [t] Plume-Compute (5 Seed-Sätze × %d h): %.1f s",
+             len(cfg.cumulative_hours_drift), time.perf_counter() - _t_loop)
+
     # Die 3 Plume-Varianten zeitaufgelöst als je 1 HTML mit Uhrzeit-Slider (11/13/15/18 h)
     hh = "/".join(f"{h:02d}" for h in cfg.cumulative_hours_drift)
     if any(by_hot.values()):
-        build_plume_3d_timeslider(grid, mask, dtm, by_hot, out / "d1_plumes_hotspots_3d.html",
-                                  f"D1 plumes — our hotspots, time-resolved {hh} h ({cfg.date})")
+        _build_3d_timed(build_plume_3d_timeslider, grid, mask, dtm, by_hot,
+                        out / "d1_plumes_hotspots_3d.html",
+                        f"D1 plumes — our hotspots, time-resolved {hh} h ({cfg.date})")
     if any(by_grid.values()):
-        build_plume_3d_timeslider(grid, mask, dtm, by_grid, out / "d1_plumes_grid_3d.html",
-                                  f"D1 plumes — {cfg.plume3d_grid_spacing_m:.0f} m grid, time-resolved {hh} h ({cfg.date})")
+        _build_3d_timed(build_plume_3d_timeslider, grid, mask, dtm, by_grid,
+                        out / "d1_plumes_grid_3d.html",
+                        f"D1 plumes — {cfg.plume3d_grid_spacing_m:.0f} m grid, time-resolved {hh} h ({cfg.date})")
     if any(by_kk7.values()):
-        build_plume_3d_timeslider(grid, mask, dtm, by_kk7, out / "d1_plumes_kk7_3d.html",
-                                  f"D1 plumes — kk7 heatmap sources, time-resolved {hh} h ({cfg.date})")
+        _build_3d_timed(build_plume_3d_timeslider, grid, mask, dtm, by_kk7,
+                        out / "d1_plumes_kk7_3d.html",
+                        f"D1 plumes — kk7 heatmap sources, time-resolved {hh} h ({cfg.date})")
     log.info("D1-Plumes zeitaufgelöst (Slider %s h): Hotspots/kk7/Netz als 3 HTML geschrieben", hh)
 
     # XC-Flugpotenzial (soaringmeteo-Adoption) zur Mittagszeit

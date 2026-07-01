@@ -25,13 +25,18 @@ um die vorausschauende Thermik-Detailtiefe.
 
 1. **Lauf starten** (venv):
    ```powershell
-   .venv\Scripts\python.exe thermik.py                 # morgen, volle Tiefe (mit 3D-Plumes)
+   .venv\Scripts\python.exe thermik.py                 # morgen, volle Tiefe (mit 3D-Plumes) @ 60 m
    .venv\Scripts\python.exe thermik.py --date 2026-07-04
    .venv\Scripts\python.exe thermik.py --skip-plumes   # ohne die schweren 3D-Plume-Slider (schneller)
+   # hires: dasselbe komplette Produkt (Plumes + alles) in VOLLER Auflösung übers ganze Gebiet.
+   # Der Horizont (Flaschenhals bei feiner Auflösung) läuft parallel auf mehreren Prozessen:
+   .venv\Scripts\python.exe thermik.py --resolution 20 --horizon-workers 6
    ```
-   Läuft das volle `thermalmodel` auf der Weit-Domäne (~39×39 km @ 60 m). Die Sondierung kommt für
-   HEUTE aus Payerne (Messung), für kommende Tage aus dem **ICON-Prognose-Profil**
-   (`meteo/forecast_sounding.py`). Ausgaben in `output/thermal_forecast/<datum>/`.
+   Läuft das volle `thermalmodel` auf der Weit-Domäne (~39×39 km, Default @ 60 m; `--resolution 20`
+   für hires). Alle Produkte landen in EINEM Ordner `output/thermal_forecast/<datum>/` (nicht auf
+   Kacheln verstreut). Die Sondierung kommt für HEUTE aus Payerne (Messung), für kommende Tage aus
+   dem **ICON-Prognose-Profil** (`meteo/forecast_sounding.py`). Die 3D-HTMLs dünnen ihr Gelände-Mesh
+   fürs Web automatisch aus (Daten/Plumes bleiben voll aufgelöst). Vgl. [[feedback-parallel-compute]].
 2. **`output/thermal_forecast/<datum>/thermik_data.json` lesen** — Kennzahlen (CAPE/LI/Nullgrad,
    Wolkenbasis/Thermik-Top, w\* max/median, z_i-Peak, XC, Startfenster) + die **`sites`**-Liste
    (pro Startplatz: `w_star_ms`, `z_i_m`, `ceiling_amsl_m`, `q_h_wm2`, `nearest_hotspot_km`,

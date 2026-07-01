@@ -91,6 +91,9 @@ class ThermalConfig:
     n_azimuth: int = 36
     horizon_step_m: float | None = None   # None -> = resolution_m
     horizon_max_steps: int = 600
+    horizon_workers: int = 1
+    """Parallel-Prozesse für die Horizontberechnung (über Azimute). 1 = seriell. Bei feiner
+    Auflösung (z. B. 20 m Weit-Domäne) auf ~Kernzahl−2 setzen — Horizont ist der Flaschenhals."""
 
     # --- Solar / Klarhimmel ---
     linke_turbidity: float | None = None  # None -> pvlib Monatsklimatologie

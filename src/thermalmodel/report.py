@@ -11,6 +11,15 @@ from .grids import Grid
 from .viz import draw_hillshade
 
 
+def mesh_stride(grid: Grid, target: int = 900) -> int:
+    """Ausdünnfaktor fürs 3D-Oberflächen-Mesh: hält die grössere Kante ~<= `target` Zellen.
+
+    In 3D-Perspektive ist feineres Mesh unsichtbar, bläht aber die HTML massiv auf. Q_H/Plume-
+    DATEN bleiben in voller Auflösung — nur die drapierte Relieffläche wird fürs Web ausgedünnt.
+    Bei 60 m (≈565×651) => 1 (unverändert), bei 20 m (≈1700×1950) => 3."""
+    return max(1, -(-max(grid.nx, grid.ny) // target))   # ceil-Division
+
+
 def write_geotiffs(grid: Grid, mask, terrain, heat, score, out_dir: Path, label: str):
     out_dir = Path(out_dir)
     m = lambda a: np.where(mask, a, np.nan)
@@ -116,11 +125,12 @@ def plot_landcover_3d(grid: Grid, mask, dtm, lc, path, title):
     for i, c in enumerate(colors):
         cs += [[i / nb, c], [(i + 1) / nb, c]]          # diskrete (gestufte) Colorscale
 
-    z = np.where(mask, dtm, np.nan).astype(float)
-    col = np.where(mask, lc.class_id, np.nan).astype(float)
+    st = mesh_stride(grid)                              # Mesh fürs Web ausdünnen (Daten bleiben voll)
+    z = np.where(mask, dtm, np.nan).astype(float)[::st, ::st]
+    col = np.where(mask, lc.class_id, np.nan).astype(float)[::st, ::st]
     w, s, e, n = grid.bounds()
-    xs = (np.arange(grid.nx) + 0.5) * grid.res
-    ys = (grid.ny - np.arange(grid.ny) - 0.5) * grid.res
+    xs = ((np.arange(grid.nx) + 0.5) * grid.res)[::st]
+    ys = ((grid.ny - np.arange(grid.ny) - 0.5) * grid.res)[::st]
     fig = go.Figure(go.Surface(
         x=xs, y=ys, z=z, surfacecolor=col, colorscale=cs, cmin=-0.5, cmax=nb - 0.5,
         colorbar=dict(title="Land cover", tickmode="array",
@@ -140,14 +150,15 @@ def plot_landcover_3d(grid: Grid, mask, dtm, lc, path, title):
 
 def build_energy_3d(grid: Grid, mask, dtm, energy, hotspots, path, title,
                     colorbar="Energy input [Wh/m²]", cmin=None, cmax=None, colorscale="Inferno"):
-    """Plotly-3D-Relief (volle Gitterauflösung), Boden nach Feldwert eingefärbt (Sequential-Map)."""
+    """Plotly-3D-Relief, Boden nach Feldwert eingefärbt (Sequential-Map). Mesh fürs Web ausgedünnt."""
     import plotly.graph_objects as go
 
-    z = np.where(mask, dtm, np.nan).astype(float)
-    c = np.where(mask, energy, np.nan).astype(float)
+    st = mesh_stride(grid)
+    z = np.where(mask, dtm, np.nan).astype(float)[::st, ::st]
+    c = np.where(mask, energy, np.nan).astype(float)[::st, ::st]
     w, s, e, n = grid.bounds()
-    xs = (np.arange(grid.nx) + 0.5) * grid.res                 # lokal, West=0
-    ys = (grid.ny - np.arange(grid.ny) - 0.5) * grid.res       # Nord oben
+    xs = ((np.arange(grid.nx) + 0.5) * grid.res)[::st]         # lokal, West=0
+    ys = ((grid.ny - np.arange(grid.ny) - 0.5) * grid.res)[::st]  # Nord oben
 
     fig = go.Figure()
     fig.add_trace(go.Surface(
@@ -174,17 +185,18 @@ def build_energy_3d(grid: Grid, mask, dtm, energy, hotspots, path, title,
 
 def build_energy_3d_timeslider(grid: Grid, mask, dtm, fields, path, title,
                                colorbar="Energy input [Wh/m²]", colorscale="Inferno",
-                               cmax=None, stride=2):
+                               cmax=None, stride=None):
     """3D-Relief mit kumuliertem Q_H-Energieeintrag drapiert + ZEIT-SLIDER über die
     Tageszeit-Stützstellen (11/13/15/18 h).
 
     fields: [(Stunde, Feld[ny,nx]), …] kumulierter Energieeintrag je Cutoff.
     Die Relief-Geometrie ist STATISCH (Basis-Trace 0); die Frames updaten NUR `surfacecolor`
-    (kein Geometrie-Bloat — wie beim Plume-Slider). `stride` dünnt das Mesh fürs Web aus.
-    Ein gemeinsames `cmax` (von aussen vorgegeben) macht ideal- vs. real-Slider direkt
-    vergleichbar (real wirkt dunkler = Wolkenverlust sichtbar)."""
+    (kein Geometrie-Bloat — wie beim Plume-Slider). `stride` dünnt das Mesh fürs Web aus
+    (None => adaptiv: 60 m bleibt bei 2, 20 m => 3). Ein gemeinsames `cmax` (von aussen
+    vorgegeben) macht ideal- vs. real-Slider direkt vergleichbar (real dunkler = Wolkenverlust)."""
     import plotly.graph_objects as go
 
+    stride = stride or max(2, mesh_stride(grid))
     z = np.where(mask, dtm, np.nan).astype(float)[::stride, ::stride]
     xs = ((np.arange(grid.nx) + 0.5) * grid.res)[::stride]
     ys = ((grid.ny - np.arange(grid.ny) - 0.5) * grid.res)[::stride]
