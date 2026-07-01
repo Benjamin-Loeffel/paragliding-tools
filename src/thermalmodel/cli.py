@@ -207,6 +207,8 @@ def main(argv=None) -> int:
     ap.add_argument("--out", default="output/thermal")
     ap.add_argument("--cache", default="cache")
     ap.add_argument("--date", default="2026-06-30")  # heute; Sondierung nutzt die neueste verfügbare
+    ap.add_argument("--resolution", type=float, default=None,
+                    help="Modellgitter-Auflösung [m] (Default: ThermalConfig, 20 m)")
     ap.add_argument("--skip-validation", action="store_true")
     ap.add_argument("--skip-plume", action="store_true", help="Phase B + D1 auslassen")
     ap.add_argument("--retrospective", action="store_true",
@@ -215,7 +217,8 @@ def main(argv=None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     cfg = ThermalConfig(kml_path=args.kml, cache_dir=Path(args.cache),
-                        output_dir=Path(args.out), date=args.date)
+                        output_dir=Path(args.out), date=args.date,
+                        **({"resolution_m": args.resolution} if args.resolution else {}))
     log.info("== Phase A (ideal+real, D0) ==")
     res = run_phase_a(cfg)
     log.info("Domäne %dx%d, %d Hotspots, Waldquelle %s",
