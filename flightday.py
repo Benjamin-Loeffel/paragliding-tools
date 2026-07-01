@@ -95,8 +95,12 @@ def run_thermal(date: str, kml: str, resolution: float, cache: str, out_dir: Pat
     from thermalmodel.wind import fetch_wind_field
     from thermalmodel.daytimeline import compute_day_timeline, optimal_window, plot_day_timeline
 
+    # Modell-Rohprodukte (energy_3d*, hotspots, qh_*, tifs …) in einen Unterordner; im Briefing-Ordner
+    # bleiben nur die zwei briefing-relevanten Plots (day_timeline, wind_traces).
+    thermal_out = out_dir / "thermal"
+    thermal_out.mkdir(parents=True, exist_ok=True)
     cfg = ThermalConfig(kml_path=kml, resolution_m=resolution, date=date,
-                        cache_dir=Path(cache), output_dir=out_dir)
+                        cache_dir=Path(cache), output_dir=thermal_out)
     res = run_phase_a(cfg)
     bl = analyze_sounding(sounding_df) if sounding_df is not None else None
     if bl is None:
