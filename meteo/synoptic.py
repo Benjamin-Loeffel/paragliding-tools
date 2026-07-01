@@ -235,7 +235,7 @@ def assess_foehn(syn: Synoptic) -> dict:
     richtung = "Süd" if np.nanmean(dp) > 0 else "Nord"
     return {"phaenomen": "2 Föhn",
             "dp_nord_sued_max_hPa": round(dp_max, 1), "tendenz": richtung,
-            "schwelle": f"|Δp| ≥{FOEHN_DP_HPA[0]:.0f} durchbrechend / ≥{FOEHN_DP_HPA[1]:.0f} bis Flachland",
+            "schwelle": f"Δp(N–S) ≥{FOEHN_DP_HPA[0]:.0f} durchbrechend / ≥{FOEHN_DP_HPA[1]:.0f} bis Flachland",
             "ampel": a,
             "begruendung": f"Δp(S−N) max {dp_max:.1f} hPa ({richtung}überdruck). "
                            f"≥8 hPa → Föhn bis ins Flachland; Live-Föhnzeichen (Föhnmauer/Linsen) vor Ort prüfen."}
