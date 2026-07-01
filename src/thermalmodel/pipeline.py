@@ -51,6 +51,10 @@ def run_phase_a(cfg: ThermalConfig) -> dict:
     tf = CoordTransformer(use_network=False)
     grid, mask, poly, (lons, lats) = build_domain(cfg, tf)
     bbox = (float(lons.min()), float(lats.min()), float(lons.max()), float(lats.max()))
+    sites_en = []                                   # Startplätze (lon,lat) → LV95 für die Q_H-Karten
+    for _name, _lon, _lat in cfg.launch_sites:
+        _E, _N = tf.to_lv95(np.array([_lon]), np.array([_lat]))
+        sites_en.append((_name, float(_E[0]), float(_N[0])))
     log.info("Gebiet: %dx%d @ %.0f m (%.0f%% im Polygon)", grid.nx, grid.ny, grid.res, 100 * mask.mean())
 
     terrain = load_terrain(cfg, grid, bbox, session)
@@ -76,7 +80,8 @@ def run_phase_a(cfg: ThermalConfig) -> dict:
     plot_landcover_3d(grid, mask, terrain.dtm, lc, out / "landcover_3d.html",
                       f"Forest cover type on the relief — {cfg.date}")
     png = plot_field_png(grid, mask, terrain.dtm, heat.Q_H_daymax, hotspots,
-                         f"Ideal Q_H heat-flux map (daily max) — {cfg.date}", out / "qh_ideal_daymax.png")
+                         f"Ideal Q_H heat-flux map (daily max) — {cfg.date}", out / "qh_ideal_daymax.png",
+                         sites=sites_en)
     html = plot_hotspot_map_html(hotspots, cfg, out / "hotspots.html")
     build_energy_3d(grid, mask, terrain.dtm, heat.Q_H_energy, hotspots,
                     out / "energy_3d.html",
@@ -115,11 +120,12 @@ def run_phase_a(cfg: ThermalConfig) -> dict:
         real["att_png"] = plot_attenuation_timeseries(clouds, out / "icon_attenuation.png", cfg.date)
         real["daymax_png"] = plot_field_png(
             grid, mask, terrain.dtm, heat_real.Q_H_daymax, hotspots,
-            f"Real Q_H heat-flux map (daily max, ICON clouds) — {cfg.date}", out / "qh_real_daymax.png")
+            f"Real Q_H heat-flux map (daily max, ICON clouds) — {cfg.date}", out / "qh_real_daymax.png",
+            sites=sites_en)
         real["diff_png"] = plot_field_png(
             grid, mask, terrain.dtm, diff_energy, None,
             f"Cloud loss of Q_H energy (ideal − real) — {cfg.date}", out / "qh_diff_energy.png",
-            cmap="inferno", unit="Wh/m²")
+            cmap="inferno", unit="Wh/m²", sites=sites_en)
         build_energy_3d(grid, mask, terrain.dtm, heat_real.Q_H_energy, hotspots,
                         out / "energy_3d_real.html",
                         f"Reale Energiemenge Q_H (ICON-Wolken) — {cfg.date}")

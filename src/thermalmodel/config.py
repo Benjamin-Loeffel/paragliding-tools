@@ -72,6 +72,11 @@ class ThermalConfig:
     """Auflösung der swissALTI3D-Kacheln fürs Höhen-Resampling (0.5 oder 2)."""
     horizon_margin_m: float = 4000.0
     """Wie weit der DEM über die Domäne hinaus geladen wird (Fernhorizont/Schatten)."""
+    launch_sites: tuple = (
+        ("Tschentenalp", 7.5453, 46.4989), ("Trutten", 7.6417, 46.5590),
+        ("Grimer", 7.6832, 46.5536), ("Niesen", 7.6524, 46.6462),
+    )
+    """Startplätze (Name, lon, lat) — als Marker auf den Q_H-Karten (nur im Gebiet sichtbar)."""
 
     # --- Tag & Zeitachse (UTC-naiv in lokaler Zeit gerechnet) ---
     date: str = "2026-06-30"

@@ -19,7 +19,9 @@ def write_geotiffs(grid: Grid, mask, terrain, heat, score, out_dir: Path, label:
     grid.to_geotiff(m(score), out_dir / f"score_{label}.tif")
 
 
-def plot_field_png(grid: Grid, mask, dtm, field, hotspots, title, path, cmap="inferno", unit="W/m²"):
+def plot_field_png(grid: Grid, mask, dtm, field, hotspots, title, path, cmap="inferno", unit="W/m²",
+                   sites=None):
+    """sites: optionale Liste (name, E, N) in LV95 → als Startplatz-Marker eingezeichnet."""
     from .plotstyle import use as _use
     plt = _use()
 
@@ -33,6 +35,15 @@ def plot_field_png(grid: Grid, mask, dtm, field, hotspots, title, path, cmap="in
         # Top-10 nummerieren
         for h in hotspots[:10]:
             ax.annotate(str(h.id), (h.e, h.n), color="cyan", fontsize=7, ha="center", va="center")
+    if sites:
+        import matplotlib.patheffects as pe
+        stroke = [pe.withStroke(linewidth=2.2, foreground="black")]
+        ax.scatter([e for _, e, n in sites], [n for _, e, n in sites], s=130, marker="*",
+                   color="white", edgecolors="black", linewidths=0.8, zorder=6, label="Startplätze")
+        for name, e, n in sites:
+            ax.annotate(name, (e, n), color="white", fontsize=8.5, fontweight="bold", ha="left",
+                        va="bottom", xytext=(5, 5), textcoords="offset points", zorder=6,
+                        path_effects=stroke)
     ax.set_title(title)
     ax.set_xlabel("LV95 East [m]"); ax.set_ylabel("LV95 North [m]")
     fig.colorbar(im, ax=ax, shrink=0.6, label=unit)
