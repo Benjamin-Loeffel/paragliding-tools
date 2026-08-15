@@ -360,17 +360,17 @@ def write_csv_events(path: Path, events: list[Event], unc=None) -> None:
 
 def write_outputs(track: FlightTrack, alt_cal, clr: ClearanceResult, cal: CalibrationResult,
                   events: list[Event], levels, e, n, dtm, dsm, unc, meta: dict, cfg: Config) -> dict:
-    cfg.output_dir.mkdir(parents=True, exist_ok=True)
     stem = track.name
+    fdir = cfg.flight_dir(stem)                 # alle Exporte eines Flugs in output/<flug>/
     paths = {
-        "map": cfg.output_dir / f"{stem}_map.html",
-        "barogram": cfg.output_dir / f"{stem}_barogram.html",
-        "points": cfg.output_dir / f"{stem}_points.csv",
-        "events": cfg.output_dir / f"{stem}_events.csv",
-        "run": cfg.output_dir / f"{stem}_run.json",
+        "map": fdir / f"{stem}_map.html",
+        "barogram": fdir / f"{stem}_barogram.html",
+        "points": fdir / f"{stem}_points.csv",
+        "events": fdir / f"{stem}_events.csv",
+        "run": fdir / f"{stem}_run.json",
     }
     if cfg.surface3d:
-        paths["terrain3d"] = cfg.output_dir / f"{stem}_3d.html"
+        paths["terrain3d"] = fdir / f"{stem}_3d.html"
 
     map_fig = build_map(track, alt_cal, clr, events, cfg, unc)
     map_fig.write_html(str(paths["map"]), include_plotlyjs=True)
@@ -379,9 +379,9 @@ def write_outputs(track: FlightTrack, alt_cal, clr: ClearanceResult, cal: Calibr
         t3d_fig = build_terrain3d(track, e, n, alt_cal, clr, events, dtm, dsm, cfg, unc)
         t3d_fig.write_html(str(paths["terrain3d"]), include_plotlyjs=True)
     if cfg.export_png:
-        save_png(map_fig, cfg.output_dir / f"{stem}_map.png", 1500, 950)
+        save_png(map_fig, fdir / f"{stem}_map.png", 1500, 950)
         if cfg.surface3d:
-            save_png(t3d_fig, cfg.output_dir / f"{stem}_3d.png", 1500, 1000)
+            save_png(t3d_fig, fdir / f"{stem}_3d.png", 1500, 1000)
     write_csv_points(paths["points"], track, alt_cal, clr, levels, unc)
     write_csv_events(paths["events"], events, unc)
 

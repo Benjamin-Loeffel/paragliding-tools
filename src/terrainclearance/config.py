@@ -136,3 +136,13 @@ class Config:
     def __post_init__(self) -> None:
         self.cache_dir = Path(self.cache_dir)
         self.output_dir = Path(self.output_dir)
+
+    def flight_dir(self, name: str) -> Path:
+        """Ausgabeordner EINES Flugs: output/<flugname>/ (wird angelegt).
+
+        Pro Flug ein eigener Unterordner — bei vielen Flügen bleibt `output/` übersichtlich.
+        Flugübergreifende Produkte (aggregate_clearance_kde, risk_over_time) bleiben in
+        `output/` selbst."""
+        d = self.output_dir / name
+        d.mkdir(parents=True, exist_ok=True)
+        return d

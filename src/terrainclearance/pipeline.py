@@ -94,7 +94,7 @@ def analyze_flight(path: str | Path, cfg: Config, session: requests.Session,
 
     # Zeit-in-Hangabstand: KDE pro Flug + Daten für den Mehrflug-Zusammenzug
     kde_fig = build_flight_kde(track.name, clr.d3_terrain, clr.d3_surface, track.t_s, airborne, cfg)
-    kde_path = cfg.output_dir / f"{track.name}_clearance_kde.html"
+    kde_path = cfg.flight_dir(track.name) / f"{track.name}_clearance_kde.html"
     kde_fig.write_html(str(kde_path), include_plotlyjs=True)
     paths["clearance_kde"] = kde_path
     dist_terrain = make_flight_dist(track.name, clr.d3_terrain, track.t_s, airborne, track.dt[0])

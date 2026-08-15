@@ -62,6 +62,9 @@ as wheels. (`kaleido` is only needed for static PNG exports and is not required.
 
 ## Outputs (`output/`)
 
+Per-flight files go into their own subdirectory `output/<flight-name>/`; the cross-flight
+summaries (`aggregate_clearance_kde.html`, `risk_over_time.html`) stay in `output/` itself.
+
 | File | Content |
 |---|---|
 | `*_map.html` | Interactive map: track colored by 3D terrain clearance, critical spots marked. |
