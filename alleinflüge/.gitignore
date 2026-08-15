@@ -1,0 +1,4 @@
+# Personendaten (Namen, Mobilnummern, Unterschriftsdaten) gehören nicht ins Repo.
+# Vorlagen und fill_checkliste.py dürfen eingecheckt werden, die Inhalte nicht.
+*_ausgefuellt.pdf
+alleinflug.yaml

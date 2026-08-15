@@ -63,6 +63,10 @@ erforderlich.)
 
 ## Ausgaben (`output/`)
 
+Die Dateien eines Flugs landen in einem eigenen Unterordner `output/<flugname>/`; die
+flugübergreifenden Zusammenzüge (`aggregate_clearance_kde.html`, `risk_over_time.html`)
+bleiben in `output/` selbst.
+
 | Datei | Inhalt |
 |---|---|
 | `*_map.html` | Interaktive Karte: Spur eingefärbt nach 3D-Hangabstand, kritische Stellen markiert. |

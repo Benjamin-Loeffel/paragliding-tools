@@ -73,10 +73,14 @@ class ThermalConfig:
     horizon_margin_m: float = 4000.0
     """Wie weit der DEM über die Domäne hinaus geladen wird (Fernhorizont/Schatten)."""
     launch_sites: tuple = (
-        ("Tschentenalp", 7.5453, 46.4989), ("Trutten", 7.6417, 46.5590),
-        ("Grimer", 7.6832, 46.5536), ("Niesen", 7.6524, 46.6462),
+        ("Mäggisseren", 7.6096, 46.5880), ("Tschentenalp", 7.5453, 46.4989),
+        ("Trutten", 7.6417, 46.5590), ("Grimer", 7.6832, 46.5536),
+        ("Niesen", 7.6524, 46.6462),
     )
-    """Startplätze (Name, lon, lat) — als Marker auf den Q_H-Karten (nur im Gebiet sichtbar)."""
+    """Startplätze (Name, lon, lat) — als Marker auf den Q_H-Karten (nur im Gebiet sichtbar).
+
+    Mäggisseren (Hausstartplatz, ~1730 m, 2.8 km W von Frutigen) ist der Median der ~24
+    Startpunkte aus `source/igc/` — nicht aus einer Karte geschätzt."""
 
     # --- Tag & Zeitachse (UTC-naiv in lokaler Zeit gerechnet) ---
     date: str = "2026-06-30"
