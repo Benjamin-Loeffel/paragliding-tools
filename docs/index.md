@@ -8,6 +8,11 @@ high-resolution swisstopo topography.
 - **[Thermals, step by step](thermal-step-by-step.md)** — **solar-driven thermal modelling**: real
   irradiance over the day → heat flux → hotspots, boundary layer (w\*/z_i) and drifting thermal columns.
 
+Plus, with no code and no data involved:
+
+- **[Flight theory cookbook](flight-theory.md)** — flight theory for the Swiss theory exam in plain
+  language: one fixed procedure per question type, with original step-by-step diagrams.
+
 All geo/weather data is fetched **at runtime** from open sources — see [Background](background.md).
 Code on [GitHub](https://github.com/Benjamin-Loeffel/paragliding-tools).
 
