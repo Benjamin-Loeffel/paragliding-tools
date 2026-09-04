@@ -8,6 +8,11 @@ der hochauflösenden swisstopo-Topografie.
 - **[Thermik, Schritt für Schritt](thermal-step-by-step.md)** — **solargetriebene Thermikmodellierung**:
   reale Einstrahlung über den Tag → Wärmestrom → Hotspots, Grenzschicht (w\*/z_i) und driftende Thermiksäulen.
 
+Dazu, ohne Code und ohne Daten:
+
+- **[Fluglehre-Rezeptbuch](flight-theory.md)** — die Fluglehre für die Theorieprüfung in einfachen
+  Worten: pro Fragentyp ein festes Vorgehen, mit selbst gezeichneten Schritt-für-Schritt-Bildern.
+
 Alle Geo-/Wetterdaten werden **zur Laufzeit** aus offenen Quellen bezogen — siehe [Hintergrund](background.md).
 Code auf [GitHub](https://github.com/Benjamin-Loeffel/paragliding-tools).
 

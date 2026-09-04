@@ -72,6 +72,7 @@ plugins:
             Terrain clearance: Hangabstand
             Thermals step by step: Thermik Schritt für Schritt
             Payerne sounding: Payerne-Sondierung
+            Flight theory cookbook: Fluglehre-Rezeptbuch
             Examples: Beispiele
             Background: Hintergrund
 
@@ -80,5 +81,6 @@ nav:
   - Terrain clearance: terrain-clearance.md
   - Thermals step by step: thermal-step-by-step.md
   - Payerne sounding: payerne.md
+  - Flight theory cookbook: flight-theory.md
   - Examples: examples.md
   - Background: background.md
