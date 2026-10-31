@@ -33,8 +33,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-# Zielpunkte (LV95 E, N, Höhe m ü. M.). Lehn: Landepunkt laut Benjamin (map.geo.admin.ch, 31.10.2026).
-ZIELE = {"lehn": (2629453.66, 1170022.09, 565.1)}
+# Zielpunkte (LV95 E, N, Höhe m ü. M., Zielkreis-Radius m). Lehn: Mitte des gemähten Zielkreises
+# laut Benjamin (map.geo.admin.ch, 31.10.2026), Kreis r = 15 m.
+ZIELE = {"lehn": (2629453.66, 1170022.09, 565.1, 15.0)}
 OUT = Path(__file__).resolve().parent / "lagecheck_out"   # gitignored
 
 KLASSEN = ("End", "Quer", "Gegen")
@@ -110,16 +111,23 @@ def _wrap(a):
 
 
 def analyse(pfad: str, ziel: str, windpfad: str | None, plot: bool) -> dict:
-    TE, TN, TH = ZIELE[ziel]
+    TE, TN, TH, R = ZIELE[ziel]
     tr = lade_igc(pfad)
     # Kalibrierung am Boden: Ruhe nach der Landung = Zielhöhe (flacher Landeplatz)
     ruhe = slice(-8, None)
     agl = tr.baro - np.median(tr.baro[ruhe])
     gnss_off = np.median(tr.gnss[ruhe]) - TH
 
-    # Touchdown: erster Punkt <= 1 m AGL, danach nie mehr über 3 m
+    # Touchdown-Fenster: Baro löst nur ~1 m auf, Ausschweben/Flare und Auslaufen sind im IGC nicht
+    # trennbar. Anfang = erster Punkt <= 1 m AGL (danach nie mehr über 3 m), Ende = Grundgeschw.
+    # (2-s-Mittel) erstmals < 10 km/h. Der echte Fusskontakt liegt dazwischen (31.10.: Benjamins
+    # Beobachtung lag 1–3 s nach dem Anfang).
     hoch = np.where(agl > 3)[0]
     td = int(np.argmax((agl <= 1.0) & (np.arange(len(agl)) > hoch[-1])))
+    gs = np.r_[0, np.hypot(np.diff(tr.e), np.diff(tr.n)) / np.maximum(1, np.diff(tr.t))] * 3.6
+    gs2 = np.convolve(gs, [0.5, 0.5], mode="same")
+    langsam = np.where((np.arange(len(gs2)) > td) & (gs2 < 10))[0]
+    aus = int(langsam[0]) if len(langsam) else td
     # Kurs geglättet (±3 s), Endanflug-Richtung = Kurs der letzten 10 s vor dem Touchdown
     k = 3
     de = np.r_[np.full(k, np.nan), tr.e[2 * k:] - tr.e[:-2 * k], np.full(k, np.nan)]
@@ -185,7 +193,10 @@ def analyse(pfad: str, ziel: str, windpfad: str | None, plot: bool) -> dict:
 
     erg = {"datei": Path(pfad).name, "final_kurs": final, "wind": w, "gnss_off": gnss_off,
            "td_zeit": _hms(tr.t[td]), "td_vor": float(vor[td]), "td_rechts": float(rechts[td]),
-           "td_dist": float(math.hypot(dx[td], dy[td])), "ecken": {}, "segmente": []}
+           "td_dist": float(math.hypot(dx[td], dy[td])), "radius": R,
+           "fenster": [(_hms(tr.t[i]), float(math.hypot(dx[i], dy[i])), float(vor[i]), float(gs2[i]))
+                       for i in range(td, aus + 1)],
+           "ecken": {}, "segmente": []}
     for name, i in ecke.items():
         if i is not None:
             erg["ecken"][name] = {"zeit": _hms(tr.t[i]), "agl": float(agl[i]), "vor": float(vor[i]),
@@ -212,9 +223,14 @@ def _drucke(erg: dict) -> None:
               f"({w[3]} Werte)  -> Gegenwind im Endanflug "
               f"{w[1] * math.cos(math.radians(w[0] - erg['final_kurs'])):+.1f} km/h (Mast 10 m; in der Höhe meist mehr)")
     kurz = "zu kurz" if erg["td_vor"] > 0 else "zu weit"
-    print(f"   Touchdown {erg['td_zeit']}: {abs(erg['td_vor']):.1f} m {kurz}, "
+    print(f"   Bodennähe (≤1 m) {erg['td_zeit']}: {abs(erg['td_vor']):.1f} m {kurz}, "
           f"{abs(erg['td_rechts']):.1f} m {'rechts' if erg['td_rechts'] > 0 else 'links'} "
           f"(Distanz {erg['td_dist']:.1f} m; GPS ±3–5 m)")
+    r = erg["radius"]
+    print(f"   Touchdown-Fenster bis Auslauf < 10 km/h (Zielkreis r = {r:.0f} m):")
+    for z, d, v, g in erg["fenster"]:
+        lage = "im Kreis" if d <= r else (f"{d - r:.0f} m vor dem Kreis" if v > 0 else f"{d - r:.0f} m hinter dem Kreis")
+        print(f"     {z}  {d:5.1f} m vom Punkt  ({lage})  GS {g:4.1f} km/h")
     print("   Eckpunkt       Zeit      Höhe AGL   vor Ziel   seitlich")
     for k, v in erg["ecken"].items():
         print(f"   {k:13s} {v['zeit']}   {v['agl']:6.0f} m   {v['vor']:+6.0f} m   {v['rechts']:+6.0f} m")
@@ -232,7 +248,7 @@ def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel):
     a = max(0, a - 30)
     b = min(len(agl), td + 5)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7.5), gridspec_kw={"width_ratios": [1.1, 1]})
-    TE, TN, _ = ZIELE[ziel]
+    TE, TN, _, R = ZIELE[ziel]
     ex, ny = tr.e - TE, tr.n - TN                     # Karte: Osten rechts, Norden oben
     sc = ax1.scatter(ex[a:b], ny[a:b], c=agl[a:b], cmap="viridis", s=6)
     ax1.plot(ex[a:b], ny[a:b], lw=0.5, color="0.6", zorder=0)
@@ -241,7 +257,7 @@ def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel):
             ax1.annotate(f"{name}\n{agl[i]:.0f} m", (ex[i], ny[i]), fontsize=7.5,
                          xytext=(6, 6), textcoords="offset points")
             ax1.plot(ex[i], ny[i], "o", ms=5, mfc="none", mec="crimson")
-    ax1.add_patch(plt.Circle((0, 0), 10, fill=False, ls="--", lw=0.7, color="crimson"))
+    ax1.add_patch(plt.Circle((0, 0), R, fill=False, ls="--", lw=0.7, color="crimson"))
     ax1.plot(0, 0, "+", color="crimson", ms=10)
     ax1.set_aspect("equal")
     w = erg["wind"]
@@ -253,7 +269,7 @@ def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel):
         ax1.text(x0, y0 + 12, f"Wind {w[1]:.0f}/{w[2]:.0f} km/h", color="steelblue", fontsize=7.5)
     ax1.set_xlabel("Osten [m] ab Zielpunkt")
     ax1.set_ylabel("Norden [m] ab Zielpunkt")
-    ax1.set_title("Grundriss (Norden oben), Zielkreis r = 10 m")
+    ax1.set_title(f"Grundriss (Norden oben), Zielkreis r = {R:.0f} m")
     ax1.grid(lw=0.3)
     fig.colorbar(sc, ax=ax1, label="Höhe AGL [m]", shrink=0.8)
     dist = np.hypot(tr.e - ZIELE[ziel][0], tr.n - ZIELE[ziel][1])

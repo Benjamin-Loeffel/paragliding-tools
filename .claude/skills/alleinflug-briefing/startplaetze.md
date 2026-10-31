@@ -27,7 +27,8 @@ Für alle Plätze gilt laut Tafel: **starke Talwinde bei labilen NW-Lagen ab Mit
   Turbulenzen bei starkem Talwind. **Keine tiefen Überflüge über Schiessstand und Schussbahn, keine
   Landung in der Schussbahn (Lebensgefahr).** Landetaxe für Nicht-DCI-Mitglieder CHF 2.– (Twint/Kasse).
   DCI: nur gelb markierte Fläche (orange Eckpunkte), umliegendes Ackerland nicht betreten.
-- **Zielpunkt Lehn** (von Benjamin gesetzt, map.geo.admin.ch): LV95 2'629'453.66 / 1'170'022.09,
+- **Zielpunkt Lehn** = Mitte des gemähten **Zielkreises r = 15 m** (im Orthofoto sichtbar; Punkt von
+  Benjamin auf map.geo.admin.ch gesetzt): LV95 2'629'453.66 / 1'170'022.09,
   565.1 m (46.680774 / 7.823607). Landeanalyse: `alleinflüge/landeanalyse.py analyse <igc> --ziel lehn
   --wind <archiv>/roh/holfuy-1850_15min.json`.
 - B Höhematte 568 m: Talwind → Linksvolte, Bergwind → Rechtsvolte; starke Turbulenzen bei labiler Luft
@@ -106,10 +107,13 @@ Halbstundentakt ~85–90 min (24.09.: Starts 09:50 / 11:15 / 12:46).
   Startplatzwahl daher an die Lage gekoppelt.
   **Geflogen** wurden zwei Flüge, beide mit Rechtsvolte. In Lehn drehte der Wind ab ~11 h auf WSW
   (Talwind) 6–9 km/h, Böen 13–15.
-  - *Flug 1:* Bergbo 11:47, Touchdown 11:58, **28 m zu kurz**. Endanflug ab 40 m AGL bei 135 m vor
-    dem Ziel. Im Queranflug zwei S-Kurven zum Höhenabbau.
-  - *Flug 2:* Luegibrüggli 13:32, Touchdown 13:38, **6 m zu kurz** (Benjamin: ~1 m; GPS ±3–5 m).
-    Endanflug ab 49 m bei 153 m.
+  - *Flug 1:* Bergbo 11:47, Landung 11:58, **~3 m vor dem Kreis** (Benjamin: ~2 m; IGC: Bodennähe
+    bei 28 m vom Punkt, Fusskontakt nach ~3 s Ausschweben bei ~18 m). Endanflug ab 40 m AGL bei
+    135 m vor dem Ziel. Im Queranflug zwei S-Kurven zum Höhenabbau.
+  - *Flug 2:* Luegibrüggli 13:32, Landung 13:38, **Punktlandung** (Benjamin: ~1 m; IGC: nächster
+    Punkt 2 m). Endanflug ab 49 m bei 153 m.
+  - Das Baro löst nur ~1 m auf: Der Fusskontakt lag 1–3 s nach «≤ 1 m AGL», also 5–10 m weiter.
+    Darum zeigt `landeanalyse.py` ein Touchdown-Fenster.
   - Gleitzahl über Grund im Endanflug 2.8–3.1, mit Bremse, Sinken 1.7–1.85 m/s.
   - Archiv: `alleinflüge/archiv/2026-10-31_interlaken/`.
 
