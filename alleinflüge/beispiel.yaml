@@ -1,0 +1,47 @@
+# Vorlage für eine Alleinflug-Planung (SHV «Alleinflug: Checkliste», V2 Juni 2025).
+# Kopieren nach  alleinflug_<YYYY-MM-DD>_<gebiet>.yaml  (gitignored — enthält Personendaten!)
+#   python alleinflüge/fill_checkliste.py alleinflüge/alleinflug_<…>.yaml --platz
+#   python alleinflüge/fill_checkliste.py alleinflüge/alleinflug_<…>.yaml \
+#       -o alleinflüge/2025_Alleinflug_Checkliste_DE_ausgefuellt_<DD_MM_YYYY>.pdf
+#
+# Im Kommentarkopf festhalten: Gelände (Tafel/Club), Messstationen, Quervergleich Vortag,
+# Prognosequellen MIT Ausgabezeit und Gültigkeitstag. Vorgehen: Skill «alleinflug-briefing».
+vorlage: "2025"
+schriftgroesse:
+  default: 10.0
+  flugplanung: 7.5      # bei Platzmangel 7.0; vorher Text straffen
+  unterwegs: 7.5
+
+felder:
+  fluglehrer: <Vorname Name>
+  flugschueler: <Vorname Name>
+
+  hoehenflug: |
+    <Wochentag DD.MM.YYYY>, Start ca. <Zeit> LT — Startplatz <Name Höhe>
+    <Alternativstart> — Landung <Landeplatz Höhe>
+
+  # 9 Planungsfragen des SHV-3x3-Rahmens; Zeilen mit «- », eingerückte Folgezeilen gehören dazu.
+  flugplanung: |
+    - Wetterphänomene: <Lage, Wind nach Höhe, Nullgrad, Wolken/Nebel — Quelle nennen>
+    - Gefahren: <Talwind/Bise/Lee/Gewitter/Nebel, mit Messwerten>
+    - Tagesverlauf: <wann wird es besser/schlechter>
+    - Erfahrung: <Flüge / Stunden aus dem Flugbuch, Erfahrung im Gebiet>
+    - Flugweg: <Startplatz -> Landeplatz, Manöver, Luftraum, Hindernisse>
+    - Landung: <Volte je nach Wind (Tafel)>
+    - Selbsteinschätzung: <Worte des Piloten> Plan B: <…> Plan C: <…>
+    - Entscheidungen: <wo/wann/nach welchen Messwerten>. Späteste Landezeit <Zeit>.
+
+  # 5 Fragen für Anreise und Startvorbereitung.
+  unterwegs: |
+    - Verhältnisse vs. Prognose: <welche Station/Webcam, welcher Schwellwert>
+    - Anreise: <Zug/Bus, Rückweg Landeplatz -> Startplatz>
+    - Passt der Plan noch? <Abbruchkriterien>
+    - Selbsteinschätzung vor Ort: Bauchgefühl und Verstand müssen übereinstimmen.
+    - Wahrnehmungsfallen: <konkret für diesen Tag>
+    - Mehr Information: <Stationen, Tonband Luftraum, Fluglehrer erreichbar>
+
+  kontakt: |
+    <Pilot Mobile> — <Fluglehrer Mobile>
+
+  ort_datum_schueler: <Ort>, <DD.MM.YYYY>
+  ort_datum_fluglehrer: <Ort>, <DD.MM.YYYY>

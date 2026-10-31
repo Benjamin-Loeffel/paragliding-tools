@@ -1,4 +1,8 @@
-# Personendaten (Namen, Mobilnummern, Unterschriftsdaten) gehören nicht ins Repo.
-# Vorlagen und fill_checkliste.py dürfen eingecheckt werden, die Inhalte nicht.
-*_ausgefuellt.pdf
-alleinflug.yaml
+# Personendaten (Namen, Mobilnummern, Wohnort, Unterschriftsdaten) gehören nicht ins Repo
+# (öffentliches GitHub-Repo). Versioniert werden nur Werkzeuge und die anonyme Beispiel-YAML.
+alleinflug*.yaml
+*_ausgefuellt*.pdf
+# SHV-Formularvorlage und Infotafeln lokal herunterladen (Quelle siehe Skill alleinflug-briefing)
+*.pdf
+# Ausgaben von lagecheck.py (Webcam-Kontaktbögen)
+lagecheck_out/
