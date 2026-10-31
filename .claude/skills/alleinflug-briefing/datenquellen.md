@@ -21,6 +21,10 @@ Kommen als **Screenshots aus der MeteoSchweiz-App** von Benjamin (kein stabiler 
 - **rF 100 % über Stunden + flache Temperatur** = Station in der Wolke. Darüber liegende Station trocken
   und wärmer = Inversion/Nebelobergrenze dazwischen.
 - Updates alle 15 min; Seite kann bis zu ~15 min hinterherhinken.
+- **Feinste Historie:** `holfuy.com/dynamic/graphs/tdarr<id>.js` (Referer = Stationsseite). Liefert
+  Mittel, Böe, Minimum, Richtung, T, rF und Druck in Lokalzeit, **für heute im 2-min-Takt**, für die
+  6 Vortage nur 15-min. Darum am Flugtag selbst `lagecheck.py archiv` laufen lassen (legt
+  `holfuy-<id>_15min.json` an, heute in 2-min-Auflösung). `/puget/mjso.php?k=<id>` = nur Livewert.
 
 ## MeteoSchweiz SMN (offene Daten, 10 min)
 - `https://data.geo.admin.ch/ch.meteoschweiz.ogd-smn/<abk>/ogd-smn_<abk>_t_now.csv` (aktueller Tag),

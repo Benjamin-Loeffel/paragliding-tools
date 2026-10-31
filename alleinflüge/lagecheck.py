@@ -354,8 +354,47 @@ def modell(lat: float, lon: float, tage: int, vortage: int, stunden: list[int]) 
     return "\n".join(z)
 
 
+def _holfuy_15min(nr: str, datum: dt.date) -> list[dict]:
+    """Holfuy-Grafikdaten (Mittel, Böe, Minimum, Richtung, T, rF, Druck; Lokalzeit) — die feinste
+    öffentliche Historie: **heute im 2-min-Takt**, die Vortage nur noch 15-min. Darum am Flugtag
+    selbst archivieren. Live-Werte (`/puget/mjso.php`) gibt es nur für den Moment."""
+    t = requests.get(f"https://holfuy.com/dynamic/graphs/tdarr{nr}.js", headers=UA, timeout=30,
+                     params={"v": "1"}).text
+    arr = {k: json.loads(v.replace("'", '"'))
+           for k, v in re.findall(r"var (\w+) = (\[.*?\]);", t, re.S)}
+    zeiten = arr.get("unt", [])
+    felder = {"gd_speed": "mittel", "gd_gust": "boee", "gd_min_wind": "minimum", "gd_direction": "richtung",
+              "gd_temp": "temp", "gd_humidity": "rf", "gd_pressure": "druck"}
+    out = []
+    for i, z in enumerate(zeiten):
+        if dt.datetime.strptime(z, "%Y/%m/%d %H:%M:%S").date() != datum:
+            continue
+        out.append({"zeit": z, **{n: (arr[k][i] if k in arr and i < len(arr[k]) else None)
+                                  for k, n in felder.items()}})
+    return out
+
+
+def _smn_tag_csv(abk: str, datum: dt.date) -> str:
+    """MeteoSchweiz SMN 10-min-Rohzeilen (UTC) eines Tages; t_now für heute, sonst t_recent."""
+    s = abk.lower()
+    for teil in (("now", "recent") if datum == dt.date.today() else ("recent",)):
+        r = requests.get(f"https://data.geo.admin.ch/ch.meteoschweiz.ogd-smn/{s}/ogd-smn_{s}_t_{teil}.csv",
+                         timeout=60)
+        if r.status_code != 200:
+            continue
+        zeilen = r.content.decode("latin-1").splitlines()
+        tag = [z for z in zeilen[1:] if z.split(";")[1].startswith(datum.strftime("%d.%m.%Y"))]
+        if tag:
+            return "\n".join([zeilen[0], *tag]) + "\n"
+    return ""
+
+
 def archiv(datum: dt.date, name: str, ids: list[str], punkt: str | None, stunden: list[int]) -> None:
-    """Rohdaten + Auswertung eines Tages sichern, solange winds.mobi sie noch hat (~48 h)."""
+    """Rohdaten + Auswertung eines Tages sichern, solange winds.mobi sie noch hat (~48 h).
+
+    Zusätzlich je `holfuy-<nr>` die Holfuy-15-min-Reihe (7 Tage verfügbar) und je `meteoswiss-<abk>`
+    die SMN-10-min-Rohdaten (alle Messgrössen, UTC).
+    """
     ziel = ARCHIV / f"{datum}_{name}"
     (ziel / "roh").mkdir(parents=True, exist_ok=True)
     st = {}
@@ -369,7 +408,16 @@ def archiv(datum: dt.date, name: str, ids: list[str], punkt: str | None, stunden
         (ziel / "roh" / f"{sid}.json").write_text(
             json.dumps({"info": info, "messungen": tag}, ensure_ascii=False, indent=1), encoding="utf-8")
         st[sid] = (info, hist)
-        print(f"  {sid}: {len(tag)} Messungen")
+        extra = ""
+        if sid.startswith("holfuy-"):
+            h15 = _holfuy_15min(sid.split("-", 1)[1], datum)
+            (ziel / "roh" / f"{sid}_15min.json").write_text(json.dumps(h15, indent=1), encoding="utf-8")
+            extra = f", Holfuy 15 min: {len(h15)}"
+        elif sid.startswith("meteoswiss-"):
+            c = _smn_tag_csv(sid.split("-", 1)[1], datum)
+            (ziel / "roh" / f"{sid}_10min.csv").write_text(c, encoding="utf-8")
+            extra = f", SMN 10 min: {max(0, len(c.splitlines()) - 1)}"
+        print(f"  {sid}: {len(tag)} Messungen{extra}")
     teile = [_matrix(st, datum, stunden)]
     b = _bise_matrix(st, datum, stunden)
     if b:

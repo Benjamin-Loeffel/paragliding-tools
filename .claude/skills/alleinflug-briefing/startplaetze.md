@@ -27,6 +27,9 @@ Für alle Plätze gilt laut Tafel: **starke Talwinde bei labilen NW-Lagen ab Mit
   Turbulenzen bei starkem Talwind. **Keine tiefen Überflüge über Schiessstand und Schussbahn, keine
   Landung in der Schussbahn (Lebensgefahr).** Landetaxe für Nicht-DCI-Mitglieder CHF 2.– (Twint/Kasse).
   DCI: nur gelb markierte Fläche (orange Eckpunkte), umliegendes Ackerland nicht betreten.
+- **Zielpunkt Lehn** (von Benjamin gesetzt, map.geo.admin.ch): LV95 2'629'453.66 / 1'170'022.09,
+  565.1 m (46.680774 / 7.823607). Landeanalyse: `alleinflüge/landeanalyse.py analyse <igc> --ziel lehn
+  --wind <archiv>/roh/holfuy-1850_15min.json`.
 - B Höhematte 568 m: Talwind → Linksvolte, Bergwind → Rechtsvolte; starke Turbulenzen bei labiler Luft
   oder starkem Talwind; sofort räumen, kein Groundhandling.
 - C Flugplatz 575 m: **nur Notlandeplatz**, im Sperrgebiet des Heliports.
@@ -101,6 +104,14 @@ Halbstundentakt ~85–90 min (24.09.: Starts 09:50 / 11:15 / 12:46).
   unten), Bergbo/Amisbühl in der Wolke, Lehn NNE 15 km/h, Böen 22 (Bergwind) → Luegibrüggli im Lee. Bise-Index +3.1 hPa und
   steigend, Bern NE 15/23, aber Thun/Gunten still; Lehn begann ab 08:45 abzuflauen.
   Startplatzwahl daher an die Lage gekoppelt.
+  **Geflogen** wurden zwei Flüge, beide mit Rechtsvolte. In Lehn drehte der Wind ab ~11 h auf WSW
+  (Talwind) 6–9 km/h, Böen 13–15.
+  - *Flug 1:* Bergbo 11:47, Touchdown 11:58, **28 m zu kurz**. Endanflug ab 40 m AGL bei 135 m vor
+    dem Ziel. Im Queranflug zwei S-Kurven zum Höhenabbau.
+  - *Flug 2:* Luegibrüggli 13:32, Touchdown 13:38, **6 m zu kurz** (Benjamin: ~1 m; GPS ±3–5 m).
+    Endanflug ab 49 m bei 153 m.
+  - Gleitzahl über Grund im Endanflug 2.8–3.1, mit Bremse, Sinken 1.7–1.85 m/s.
+  - Archiv: `alleinflüge/archiv/2026-10-31_interlaken/`.
 
 ---
 
