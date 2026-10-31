@@ -47,6 +47,8 @@ ZIELE = {"lehn": (2629453.66, 1170022.09, 565.1, 15.0)}
 OUT = Path(__file__).resolve().parent / "lagecheck_out"   # gitignored
 
 KLASSEN = ("End", "Quer", "Gegen")
+VORLAUF = 180          # s vor dem Gegenanflug in Karten/Plots (Höhenabbau im Positionsraum sichtbar)
+KARTE = "ch.swisstopo.swissimage"                    # Luftbild; Landeskarte: ch.swisstopo.pixelkarte-farbe
 
 
 # ------------------------------------------------------------------ IGC
@@ -367,7 +369,7 @@ def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel):
     from thermalmodel.plotstyle import use
     plt = use()
     a = ecke["Gegenanflug"] if ecke["Gegenanflug"] is not None else max(0, td - 180)
-    a = max(0, a - 30)
+    a = max(0, a - VORLAUF)
     b = min(len(agl), td + 5)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7.5), gridspec_kw={"width_ratios": [1.1, 1]})
     TE, TN, _, R = ZIELE[ziel]
@@ -377,10 +379,10 @@ def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel):
     for name, i in ecke.items():
         if i is not None:
             ax1.annotate(f"{name}\n{agl[i]:.0f} m", (ex[i], ny[i]), fontsize=7.5,
-                         xytext=(6, 6), textcoords="offset points")
+                         xytext=(6, 6), textcoords="offset points", bbox=_KASTEN)
             ax1.plot(ex[i], ny[i], "o", ms=5, mfc="none", mec="crimson")
-    ax1.add_patch(plt.Circle((0, 0), R, fill=False, ls="--", lw=0.7, color="crimson"))
-    ax1.plot(0, 0, "+", color="crimson", ms=10)
+    ax1.add_patch(plt.Circle((0, 0), R, fill=False, ls="--", lw=1.0, color="red"))
+    ax1.plot(0, 0, "+", color="red", ms=10)
     ax1.set_aspect("equal")
     _karte(ax1, ziel, *_rand(ex[a:b], ny[a:b], 40))
     w = erg["wind"]
@@ -389,7 +391,7 @@ def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel):
         x0, y0 = ax1.get_xlim()[0] + 40, ax1.get_ylim()[1] - 40
         ax1.annotate("", (x0 + 60 * math.sin(zu), y0 + 60 * math.cos(zu)), (x0, y0),
                      arrowprops=dict(arrowstyle="-|>", color="steelblue", lw=1.2))
-        ax1.text(x0, y0 + 12, f"Wind {w[1]:.0f}/{w[2]:.0f} km/h", color="steelblue", fontsize=7.5)
+        ax1.text(x0, y0 + 12, f"Wind {w[1]:.0f}/{w[2]:.0f} km/h", color="steelblue", fontsize=7.5, bbox=_KASTEN)
     ax1.set_xlabel("Osten [m] ab Zielpunkt")
     ax1.set_ylabel("Norden [m] ab Zielpunkt")
     ax1.set_title(f"Grundriss (Norden oben), Zielkreis r = {R:.0f} m")
@@ -416,13 +418,22 @@ def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel):
 
 # ------------------------------------------------------------------ Karte
 
+_KASTEN = dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.75)
+
+
+def _kontur(farbe: str = "white", breite: float = 3.0):
+    """Umrandung für Linien/Text auf dem Luftbild."""
+    import matplotlib.patheffects as pe
+    return [pe.Stroke(linewidth=breite, foreground=farbe), pe.Normal()]
+
+
 def _rand(x, y, rand: float):
     """Kartenausschnitt (x0, x1, y0, y1) relativ zum Ziel um die Punkte, mit Rand in m."""
     return (float(np.min(x)) - rand, float(np.max(x)) + rand, float(np.min(y)) - rand, float(np.max(y)) + rand)
 
 
 def _karte(ax, ziel: str, x0: float, x1: float, y0: float, y1: float,
-           ebene: str = "ch.swisstopo.pixelkarte-farbe", alpha: float = 0.8) -> None:
+           ebene: str = KARTE, alpha: float = 0.9) -> None:
     """swisstopo-Karte (WMS, LV95) als Hintergrund; Achsen in m relativ zum Zielpunkt. Cache in OUT/karten."""
     import matplotlib.image as mpimg
     import requests
@@ -445,7 +456,8 @@ def _karte(ax, ziel: str, x0: float, x1: float, y0: float, y1: float,
     ax.imshow(mpimg.imread(f), extent=(x0, x1, y0, y1), zorder=-1, alpha=alpha)
     ax.set_xlim(x0, x1)
     ax.set_ylim(y0, y1)
-    ax.text(0.995, 0.005, "Karte © swisstopo", transform=ax.transAxes, ha="right", va="bottom", fontsize=6)
+    ax.text(0.995, 0.005, "© swisstopo", transform=ax.transAxes, ha="right", va="bottom", fontsize=6,
+            bbox=_KASTEN)
 
 
 def _aus_achse(vor, rechts, kurs: float):
@@ -485,47 +497,52 @@ def volten(winde: list[float], kurs: float, seite: str, faktor: float, igcs: lis
         h_g = h_q + (P + le) * KALIB["Gegen"][1] / ((KALIB["Gegen"][0] + u) / 3.6)
         x, y = _aus_achse([-P, le, le, 0], [sg * Q, sg * Q, 0, 0], kurs)
         pkt += list(zip(x, y))
-        ax.plot(x, y, "-", color=c, lw=2.2, zorder=3,
+        ax.plot(x, y, "-", color=c, lw=2.2, zorder=3, path_effects=_kontur("white", 4),
                 label=f"Gegenwind {u:.0f} km/h (Mast ≈ {u / faktor:.0f}): Gegen {h_g:.0f} m · Quer {h_q:.0f} m"
                       f" · End 50 m bei {le:.0f} m")
         ax.plot(x[:3], y[:3], "o", color=c, ms=6, mec="k", mew=0.5, zorder=4)
         for xi, yi, hh, dy in ((x[0], y[0], h_g, 5 + 11 * j), (x[1], y[1], h_q, 5), (x[2], y[2], 50, -12)):
             ax.annotate(f"{hh:.0f}", (xi, yi), xytext=(5, dy), textcoords="offset points",
-                        fontsize=8, color=c, fontweight="bold", zorder=5)
+                        fontsize=8, color=c, fontweight="bold", zorder=5, path_effects=_kontur("white", 2.5))
     # Positionsraum (Höhenabbau, Achten) luvseitig hinter dem Punkt
     cx, cy = _aus_achse([-P - 70], [sg * Q * 0.75], kurs)
-    ax.add_patch(plt.Circle((cx[0], cy[0]), 90, color="tab:green", alpha=0.15, zorder=2))
-    ax.text(cx[0], cy[0], "Positionsraum\n(luvseitig)", ha="center", va="center", fontsize=8, color="darkgreen")
+    ax.add_patch(plt.Circle((cx[0], cy[0]), 90, fc="lime", alpha=0.12, ec="lime", lw=1.2, zorder=2))
+    ax.text(cx[0], cy[0], "Positionsraum\n(luvseitig)", ha="center", va="center", fontsize=8, color="darkgreen",
+            bbox=_KASTEN)
     TE, TN = ZIELE[ziel][:2]
     for igc in igcs:                                # geflogene Volten darüber
         tr, agl, ecke, td = _still(igc, ziel)["_intern"]
-        a = max(0, (ecke["Gegenanflug"] or td - 180) - 30)
-        ax.plot(tr.e[a:td + 3] - TE, tr.n[a:td + 3] - TN, "-", color="k", lw=0.8, alpha=0.7, zorder=3)
+        a = max(0, (ecke["Gegenanflug"] or td - 180) - VORLAUF)
+        ax.plot(tr.e[a:td + 3] - TE, tr.n[a:td + 3] - TN, "-", color="white", lw=1.0, zorder=3,
+                path_effects=_kontur("black", 2.2))
+        pkt += list(zip(tr.e[a:td + 3] - TE, tr.n[a:td + 3] - TN))
         for k in ("Gegenanflug", "Queranflug", "Endanflug"):
             i = ecke[k]
             if i is not None:
-                ax.plot(tr.e[i] - TE, tr.n[i] - TN, "s", ms=4, color="k", zorder=4)
-                ax.annotate(f"{agl[i]:.0f}", (tr.e[i] - TE, tr.n[i] - TN), xytext=(-16, 4),
-                            textcoords="offset points", fontsize=7)
+                ax.plot(tr.e[i] - TE, tr.n[i] - TN, "s", ms=5, color="white", mec="k", zorder=4)
+                ax.annotate(f"{agl[i]:.0f}", (tr.e[i] - TE, tr.n[i] - TN), xytext=(-18, 4),
+                            textcoords="offset points", fontsize=7.5, bbox=_KASTEN)
     if igcs:
-        ax.plot([], [], "-s", color="k", lw=0.8, ms=4,
+        ax.plot([], [], "-s", color="white", mec="k", lw=1.0, ms=5, path_effects=_kontur("black", 2.2),
                 label="geflogen: " + ", ".join(f"{Path(i).stem[:10]} #{Path(i).stem[-1]}" for i in igcs)
                       + " (Eckpunkte m AGL)")
     R = ZIELE[ziel][3]
-    ax.add_patch(plt.Circle((0, 0), R, fill=False, lw=1.2, color="crimson", zorder=5))
-    ax.add_patch(plt.Circle((0, 0), 17, fill=False, lw=0.8, ls="--", color="crimson", zorder=5))
-    wx, wy = _aus_achse([-P - 70], [-sg * 120], kurs)  # Windpfeil, weht entgegen dem Endanflug
-    zu = math.radians(kurs + 180)
-    ax.annotate("", (wx[0] + 80 * math.sin(zu), wy[0] + 80 * math.cos(zu)), (wx[0], wy[0]),
-                arrowprops=dict(arrowstyle="-|>", color="steelblue", lw=2.5))
-    ax.text(wx[0], wy[0] + 15, f"Wind aus {kurs % 360:.0f}°", color="steelblue", fontsize=9, ha="center")
+    ax.add_patch(plt.Circle((0, 0), R, fill=False, lw=1.5, color="red", zorder=5))
+    ax.add_patch(plt.Circle((0, 0), 17, fill=False, lw=1.0, ls="--", color="red", zorder=5))
+    zu = math.radians(kurs + 180)                     # Windpfeil oben rechts, weht entgegen dem Endanflug
+    ax.annotate("", (0.92 + 0.05 * math.sin(zu), 0.90 + 0.05 * math.cos(zu)), (0.92, 0.90),
+                xycoords="axes fraction", arrowprops=dict(arrowstyle="-|>", color="deepskyblue", lw=3,
+                                                          path_effects=_kontur("white", 5)))
+    ax.text(0.92, 0.97, f"Wind aus {kurs % 360:.0f}°", transform=ax.transAxes, color="steelblue", fontsize=9,
+            ha="center", bbox=_KASTEN)
     ax.set_aspect("equal")
     xs, ys = zip(*pkt)
-    _karte(ax, ziel, *_rand(np.r_[xs, cx, wx], np.r_[ys, cy, wy], 120), ebene=ebene)
+    _karte(ax, ziel, *_rand(np.r_[xs, cx], np.r_[ys, cy], 60), ebene=ebene)
     ax.set_xlabel("Osten [m] ab Zielpunkt")
     ax.set_ylabel("Norden [m] ab Zielpunkt")
     ax.set_title(f"Landevolten Lehn — {'Rechts' if sg > 0 else 'Links'}volte, Endanflug {kurs:.0f}°, "
-                 f"Endanflug ab 50 m AGL; Zahlen = Höhe AGL am Eckpunkt (Planmodell, 7 Flüge)", fontsize=10)
+                 f"Endanflug ab 50 m AGL; Zahlen = Höhe AGL am Eckpunkt (Planmodell, 7 Flüge); "
+                 f"geflogen ab {VORLAUF // 60} min vor dem Gegenanflug", fontsize=10)
     ax.legend(loc="lower left", fontsize=7.5, framealpha=0.9)
     OUT.mkdir(exist_ok=True)
     f = OUT / f"volten_lehn_{kurs:.0f}_{seite}.png"
@@ -544,11 +561,11 @@ def karte_alle(igcs: list[str], ziel: str, ebene: str) -> None:
     for igc, c in zip(igcs, farben):
         e = _still(igc, ziel)
         tr, agl, ecke, td = e["_intern"]
-        a = max(0, (ecke["Gegenanflug"] or td - 180) - 30)
+        a = max(0, (ecke["Gegenanflug"] or td - 180) - VORLAUF)
         x, y = tr.e[a:td + 3] - TE, tr.n[a:td + 3] - TN
         alle_x += list(x)
         alle_y += list(y)
-        ax.plot(x, y, "-", color=c, lw=1.4,
+        ax.plot(x, y, "-", color=c, lw=1.4, path_effects=_kontur("white", 2.8),
                 label=f"{Path(igc).stem[:10]} #{Path(igc).stem[-1]}: Endanflug {e['final_kurs']:.0f}°, ab "
                       f"{agl[ecke['Endanflug']]:.0f} m / {e['e_dist']:.0f} m, "
                       f"{abs(e['td_vor']):.0f} m zu {'kurz' if e['td_vor'] > 0 else 'weit'}")
@@ -557,14 +574,16 @@ def karte_alle(igcs: list[str], ziel: str, ebene: str) -> None:
             if i is not None:
                 ax.plot(tr.e[i] - TE, tr.n[i] - TN, "o", ms=5, color=c, mec="k", mew=0.5)
                 ax.annotate(f"{agl[i]:.0f}", (tr.e[i] - TE, tr.n[i] - TN), xytext=(4, 4),
-                            textcoords="offset points", fontsize=7, color=c, fontweight="bold")
-        ax.plot(tr.e[td] - TE, tr.n[td] - TN, "x", ms=8, mew=2, color=c)
-    ax.add_patch(plt.Circle((0, 0), R, fill=False, lw=1.2, color="crimson", zorder=5))
+                            textcoords="offset points", fontsize=7, color=c, fontweight="bold",
+                            path_effects=_kontur("white", 2.5))
+        ax.plot(tr.e[td] - TE, tr.n[td] - TN, "x", ms=8, mew=2, color=c, path_effects=_kontur("white", 4))
+    ax.add_patch(plt.Circle((0, 0), R, fill=False, lw=1.5, color="red", zorder=5))
     ax.set_aspect("equal")
     _karte(ax, ziel, *_rand(alle_x, alle_y, 60), ebene=ebene)
     ax.set_xlabel("Osten [m] ab Zielpunkt")
     ax.set_ylabel("Norden [m] ab Zielpunkt")
-    ax.set_title("Landungen Lehn — Volten bis Bodennähe (×), Zahlen = Höhe AGL an Gegen/Quer/End", fontsize=10)
+    ax.set_title(f"Landungen Lehn — ab {VORLAUF // 60} min vor dem Gegenanflug bis Bodennähe (×), "
+                 f"Zahlen = Höhe AGL an Gegen/Quer/End", fontsize=10)
     ax.legend(loc="lower left", fontsize=7.5, framealpha=0.9)
     OUT.mkdir(exist_ok=True)
     f = OUT / "landungen_lehn_alle.png"
@@ -777,11 +796,11 @@ def main(argv=None) -> int:
     v.add_argument("--faktor", type=float, default=1.3, help="Höhenwind / Mastwind")
     v.add_argument("--flug", nargs="*", default=[], help="geflogene IGC zum Vergleich darüberlegen")
     v.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
-    v.add_argument("--ebene", default="ch.swisstopo.pixelkarte-farbe", help="WMS-Ebene, z. B. ch.swisstopo.swissimage")
+    v.add_argument("--ebene", default=KARTE, help="WMS-Ebene (Landeskarte: ch.swisstopo.pixelkarte-farbe)")
     k = sub.add_parser("karte", help="alle Landungen auf einer Karte")
     k.add_argument("igc", nargs="+")
     k.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
-    k.add_argument("--ebene", default="ch.swisstopo.pixelkarte-farbe")
+    k.add_argument("--ebene", default=KARTE)
     h = sub.add_parser("hoehen", help="GPS-/Baro-Höhe an Start und Landung gegen swissALTI3D")
     h.add_argument("igc", nargs="+")
     h.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
