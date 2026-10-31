@@ -61,6 +61,18 @@ Fakten** entscheiden können, und das SHV-Formular sauber ausgefüllt vorliegt. 
 - **Webcam-Verlauf** (`lagecheck.py webcam <slug> --verlauf <gestern>`): stündlich zeigt, ob sich Nebel
   **auflöst** oder nur **hebt** und wann. Eine Kamera auf **Startplatzhöhe** (Interlaken: Harder Kulm)
   und eine **von oben** (Schynige Platte) zusammen lesen.
+- **Bergwind oder Bise?** Nicht aus einer einzelnen Station schliessen (31.10.: «Bise» war ein
+  Fehlschluss, Benjamin hat ihn korrigiert). Prüfen:
+  - *Richtung:* Bergwind bläst an jeder Station entlang des **eigenen Tals** (Lehn NNE, Interlaken S,
+    Brienz ESE); Bise ist grossräumig NE und im Mittelland am stärksten.
+  - *Tagesgang:* Bergwind ist nachts/morgens am stärksten und schläft gegen Mittag ein; die Bise ist
+    **nachmittags** am stärksten (SRF Meteo).
+  - *Index:* `lagecheck.py bise` — Druck Güttingen/Kloten höher als Genf (ab ~+2 hPa mit NE-Wind).
+  - *Kette:* Erreicht die Bise das Gebiet? Stationen vom Mittelland bis zum Landeplatz verfolgen
+    (winds.mobi, Kette je Gebiet in startplaetze.md). Bleiben die Zwischenstationen still, kommt sie
+    nicht an — dann ist der Wind am Landeplatz lokal.
+  Die Lee-Regeln gelten für beides; der Unterschied entscheidet über den **Zeitpunkt** (Bergwind bricht
+  im Tagesgang zusammen, Bise nimmt zu).
 
 ### 4. Startplatz-Logik
 - Lee-, Volten- und Windregeln aus Tafel/Club pro Startplatz anwenden (startplaetze.md).
@@ -68,7 +80,7 @@ Fakten** entscheiden können, und das SHV-Formular sauber ausgefüllt vorliegt. 
   Boden und zum Landeplatz.** Höhe unter der Basis braucht es nicht (Benjamins Korrektur, 31.10.).
   Hinweis bleibt: die Basis kann wieder auf den Startplatz sinken; kein Start in eine Nebellücke.
 - Reihenfolge der Startplätze **an die Lage koppeln**, nicht fix setzen (31.10.: Luegibrüggli nebelfrei,
-  aber Bise = Lee; Bergbo windtauglich, aber in der Wolke).
+  aber Bergwind in Lehn = Lee; Bergbo windtauglich, aber in der Wolke).
 
 ### 5. ÖV und Tagesplan
 - `lagecheck.py fahrplan <von> <nach> --datum … --zeit …` (Haltestellen-IDs in startplaetze.md).
@@ -77,6 +89,9 @@ Fakten** entscheiden können, und das SHV-Formular sauber ausgefüllt vorliegt. 
   realistischen **Runden** pro Startplatz rechnen (Interlaken: Luegibrüggli passt in den Stundentakt,
   Bergbo verpasst über Mittag den Anschluss knapp).
 - Bei unsicherem Nebel/Wind: **laufende Beobachtung** zuhause, erster passender Zug — kein fixer Termin.
+- **Entscheid unten im Tal treffen**, bevor der Bus einen Startplatz festlegt (Interlaken: an der
+  Haltestelle Interlaken West vor dem Bus 101 — von Bhendenchehr zum Bergbo ist es zu weit). Lieber
+  einen Zug später fahren und den Entscheid auf frische Messwerte stützen.
 
 ### 6. Formular füllen (`fill_checkliste.py`)
 - YAML aus `beispiel.yaml` kopieren; Gelände, Stationen, Quervergleich und Quellen (mit Ausgabezeit) in

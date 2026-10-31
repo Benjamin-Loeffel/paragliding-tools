@@ -8,6 +8,8 @@ Holt, was sich beim Interlaken-Briefing bewährt hat (Quellen siehe
                rF 100 % über Stunden = Station steckt in der Wolke (Nebel/Stratus).
     smn        MeteoSchweiz SMN (offene Daten, 10 min): Wind, Böe, Sonne, Globalstrahlung.
                Sonne 0 min + tiefe Strahlung = Hochnebel über der Station.
+    bise       Bise-Index: Druckdifferenz Güttingen/Kloten − Genf (QFF) + Wind Genf.
+               + ~2 hPa mit NE-Wind = Bise; Bise ist nachmittags am stärksten.
     webcam     Roundshot-Panoramen: aktuelles Bild oder stündlicher Verlauf eines Tages
                als Kontaktbogen (JPG) — zeigt, wann/ob sich Nebel hebt.
     fahrplan   Verbindungen (transport.opendata.ch), z. B. Rückweg Landeplatz -> Startplatz.
@@ -15,6 +17,7 @@ Holt, was sich beim Interlaken-Briefing bewährt hat (Quellen siehe
 Beispiele:
     python alleinflüge/lagecheck.py holfuy 1850 1808 1829
     python alleinflüge/lagecheck.py smn INT THU BRZ
+    python alleinflüge/lagecheck.py bise --ab 6
     python alleinflüge/lagecheck.py webcam interlaken-harderkulm schynige-platte
     python alleinflüge/lagecheck.py webcam interlaken-harderkulm --verlauf 2026-10-30
     python alleinflüge/lagecheck.py fahrplan 8576887 8504110 --datum 2026-10-31 --zeit 11:00
@@ -75,27 +78,38 @@ def holfuy(stationen: list[str], n: int) -> None:
 
 # ------------------------------------------------------------------ MeteoSchweiz SMN
 
-def smn(stationen: list[str], ab_stunde: int) -> None:
-    """MeteoSchweiz OGD, 10-min-Werte des laufenden Tages. Zeitstempel UTC -> Lokalzeit."""
+def _smn_stunden(abk: str) -> list[tuple[dt.datetime, dict]] | None:
+    """MeteoSchweiz OGD, 10-min-Werte des laufenden Tages -> volle Stunden in Lokalzeit."""
     try:
         from zoneinfo import ZoneInfo
         tz = ZoneInfo("Europe/Zurich")
     except Exception:          # tzdata fehlt -> MEZ annähern
         tz = dt.timezone(dt.timedelta(hours=1))
+    s = abk.lower()
+    r = requests.get(f"https://data.geo.admin.ch/ch.meteoschweiz.ogd-smn/{s}/ogd-smn_{s}_t_now.csv",
+                     timeout=30)
+    if r.status_code != 200:
+        return None
+    out = []
+    for row in csv.DictReader(io.StringIO(r.content.decode("latin-1")), delimiter=";"):
+        t = dt.datetime.strptime(row["reference_timestamp"], "%d.%m.%Y %H:%M").replace(
+            tzinfo=dt.timezone.utc).astimezone(tz)
+        if t.minute == 0:
+            out.append((t, row))
+    return out
+
+
+def smn(stationen: list[str], ab_stunde: int) -> None:
+    """MeteoSchweiz OGD, 10-min-Werte des laufenden Tages. Zeitstempel UTC -> Lokalzeit."""
     for s in stationen:
-        s = s.lower()
-        url = f"https://data.geo.admin.ch/ch.meteoschweiz.ogd-smn/{s}/ogd-smn_{s}_t_now.csv"
-        r = requests.get(url, timeout=30)
-        if r.status_code != 200:
-            print(f"== SMN {s.upper()}: {r.status_code}")
+        rows = _smn_stunden(s)
+        if rows is None:
+            print(f"== SMN {s.upper()}: nicht verfügbar")
             continue
-        rows = list(csv.DictReader(io.StringIO(r.content.decode("latin-1")), delimiter=";"))
         print(f"== SMN {s.upper()}  (Lokalzeit, volle Stunden)")
         print("   Zeit  Richtung   Mittel  Böe   Sonne/10min  Strahlung")
-        for row in rows:
-            t = dt.datetime.strptime(row["reference_timestamp"], "%d.%m.%Y %H:%M").replace(
-                tzinfo=dt.timezone.utc).astimezone(tz)
-            if t.minute or t.hour < ab_stunde:
+        for t, row in rows:
+            if t.hour < ab_stunde:
                 continue
             try:
                 d = float(row["dkl010z0"]); v = float(row["fu3010z0"]); g = float(row["fu3010z1"])
@@ -103,6 +117,36 @@ def smn(stationen: list[str], ab_stunde: int) -> None:
             except ValueError:
                 w = "  – (kein Wind)            "
             print(f"   {t:%H:%M}  {w}  {row.get('sre000z0', ''):>5} min  {row.get('gre000z0', ''):>6} W/m²")
+
+
+def bise(ab_stunde: int) -> None:
+    """Bise-Indikator: Druckdifferenz Nordost − Genf (QFF) + Wind in Genf.
+
+    Bise, sobald der Druck im Nordosten (Güttingen/Kloten) höher ist als in Genf; je grösser die
+    Differenz, desto stärker (Faustregel ab ~2 hPa mit NE-Wind; ~8–9 hPa = aussergewöhnlicher
+    Bisensturm laut MeteoSchweiz). Die Bise ist nachmittags am stärksten (SRF Meteo) — ein
+    Nacht-/Morgenwind, der mittags einschläft, ist eher Bergwind.
+    """
+    daten = {k: _smn_stunden(k) for k in ("GVE", "KLO", "GUT")}
+    if any(v is None for v in daten.values()):
+        print("Stationen nicht verfügbar:", [k for k, v in daten.items() if v is None]); return
+    qff = {k: {t: row.get("pp0qffs0") for t, row in v} for k, v in daten.items()}
+    print("Bise-Index (QFF hPa, Lokalzeit)   + = Druck NE höher als Genf = Bise")
+    print("   Zeit   GUT−GVE  KLO−GVE   Wind Genf")
+    for t, row in daten["GVE"]:
+        if t.hour < ab_stunde:
+            continue
+        try:
+            g = float(qff["GVE"][t])
+            d_gut = float(qff["GUT"][t]) - g
+            d_klo = float(qff["KLO"][t]) - g
+        except (KeyError, ValueError, TypeError):
+            continue
+        try:
+            w = f"{_richtung(float(row['dkl010z0'])):>4} {float(row['fu3010z0']):4.1f}/{float(row['fu3010z1']):4.1f} km/h"
+        except ValueError:
+            w = "–"
+        print(f"   {t:%H:%M}   {d_gut:+5.1f}    {d_klo:+5.1f}    {w}")
 
 
 # ------------------------------------------------------------------ Roundshot-Webcams
@@ -185,6 +229,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     h = sub.add_parser("holfuy"); h.add_argument("ids", nargs="+"); h.add_argument("-n", type=int, default=8)
     s = sub.add_parser("smn"); s.add_argument("ids", nargs="+"); s.add_argument("--ab", type=int, default=6)
+    b = sub.add_parser("bise"); b.add_argument("--ab", type=int, default=0)
     w = sub.add_parser("webcam"); w.add_argument("slugs", nargs="+")
     w.add_argument("--verlauf", metavar="YYYY-MM-DD", help="stündlicher Verlauf dieses Tages")
     w.add_argument("--stunden", default="8-16", help="z. B. 8-16 (Default)")
@@ -197,6 +242,8 @@ def main(argv: list[str] | None = None) -> int:
         holfuy(a.ids, a.n)
     elif a.cmd == "smn":
         smn(a.ids, a.ab)
+    elif a.cmd == "bise":
+        bise(a.ab)
     elif a.cmd == "webcam":
         lo, hi = (int(x) for x in a.stunden.split("-"))
         webcam(a.slugs, a.verlauf, list(range(lo, hi + 1)))

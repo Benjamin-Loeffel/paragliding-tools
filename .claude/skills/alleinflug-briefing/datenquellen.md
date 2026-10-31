@@ -30,6 +30,24 @@ Kommen als **Screenshots aus der MeteoSchweiz-App** von Benjamin (kein stabiler 
 - Hochnebel-Test: Sonne 0 min + Mittags-Strahlung weit unter Klarhimmel (Ende Oktober ~400 W/m²).
 - Standort prüfen: eine Station am Talausgang misst lokale Talwinde (INT/Lütschinental).
 
+## winds.mobi (alle Windstationen auf einer Karte, mit API)
+- Sammelt MeteoSchweiz, Holfuy, Pioupiou, Windline, SLF, METAR u. a. Karte: `winds.mobi/map/<id>`.
+- API: `https://winds.mobi/api/2.3/stations/?near-lat=..&near-lon=..&near-distance=<m>&limit=200`
+  (letzte Messung je Station: `w-dir`, `w-avg`, `w-max` km/h, `hum`, `pres.qff`, Zeit `_id` = Unix),
+  Einzelstation `…/stations/<id>/`, Verlauf `…/stations/<id>/historic/?duration=<s>`.
+- Ideal für **Ketten**: erreicht ein grossräumiger Wind (Bise) das Gebiet, oder ist der Wind am
+  Landeplatz lokal? Stationen vom Mittelland bis zum Landeplatz nebeneinander lesen.
+
+## Bise-Indikatoren
+- **Druckdifferenz Nordost − Genf** (Güttingen oder Kloten minus Genf, QFF): Bise, sobald der Druck
+  im Nordosten höher ist; Faustregel ab ~2 hPa mit NE-Wind (Meteomatics: Genf − Konstanz < −2 hPa);
+  ~8–9 hPa = aussergewöhnlicher Bisensturm (MeteoSchweiz-Blog Feb. 2023). `lagecheck.py bise`.
+- **Tagesgang** (SRF Meteo): Bise nachmittags am stärksten, nachts schwächer; Böen bis ~2–2.5× Mittel.
+- Je stärker die Bise, desto höher meist die Hochnebel-Obergrenze (SRF).
+- Abgrenzung zum Bergwind: siehe SKILL.md («Bergwind oder Bise?»).
+- Quellen: meteoschweiz.admin.ch Blog «Bisensturm» (2023/02), srf.ch/meteo «Tagesgang der Bise»,
+  meteomatics.com «wind phenomena».
+
 ## Webcams (Roundshot)
 - Struktur: `https://jungfrau.roundshot.com/<slug>/structure.json` → Liste der Panoramen des Tages
   (alle 10 min) mit URLs in mehreren Auflösungen (`quarter` ≈ 2971×512 reicht).

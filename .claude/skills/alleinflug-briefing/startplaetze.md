@@ -40,14 +40,30 @@ Auswärtige Flugschulen: Online-Registrierung beim DCI.
 
 | Station | Höhe | Wozu | Abruf |
 |---|---|---|---|
-| **Holfuy 1850 Lehn** | 560 m | Wind am Landeplatz: Berg-/Talwind/Bise, Volte, Lee-Regel Luegibrüggli | `lagecheck.py holfuy 1850` |
+| **Holfuy 1850 Lehn** | 560 m | Wind am Landeplatz: Berg-/Talwind, Volte, Lee-Regel Luegibrüggli | `lagecheck.py holfuy 1850` |
 | **Holfuy 1808 Amisbühl** | 1315 m | **≈ Bergbo** (250 m daneben): Startplatz in der Wolke? (rF) | `holfuy 1808` |
 | **Holfuy 1829 Hohwald** | 1600 m | über/unter Nebelobergrenze? | `holfuy 1829` |
 | MeteoSchweiz INT Interlaken | 578 m | Sonne/Strahlung (Hochnebel?) | `lagecheck.py smn INT` |
-| MeteoSchweiz THU / BRZ | 570 / 567 m | Bise-/Talwindmuster an den Seeenden | `smn THU BRZ` |
+| MeteoSchweiz THU / BRZ | 570 / 567 m | Windmuster an den Seeenden (Thun = Bise-Kette, Brienz = Bergwind Brienzersee) | `smn THU BRZ` |
+| Holfuy 1804 Höhematte | 630 m | S-Wind = Bergwind aus dem Lütschinental (wie INT) | `holfuy 1804` |
+| windline 4109 Niederhorn | 1960 m | Wind über dem Nebeldeckel | winds.mobi |
 
 **INT liegt in Matten am Ausgang des Lütschinentals.** Ihr Morgenwind (S) ist der Bergwind aus dem
 Lütschinental und für Lehn **nicht repräsentativ** — für Lehn immer Holfuy 1850.
+
+**Lehn-Wind lesen:** Der NNE in Lehn ist meist **lokaler Bergwind** (aus Richtung Habkern/Lombach):
+nachts und morgens 10–15 km/h (Böen ~20), bricht gegen **~10 h** zusammen, kommt gegen 18 h zurück
+(30./31.10. gemessen). Bise erkennt man nicht an Lehn allein, sondern an der Kette unten.
+
+**Bise-Kette** (winds.mobi-IDs; erreicht die Bise das Bödeli?):
+Bern/Zollikofen `meteoswiss-BER` (Koppigen `meteoswiss-KOP`, Bantiger `meteoswiss-BAN`) →
+Thun `meteoswiss-THU`, Thun Hafeneinfahrt `pioupiou-1723`, Tschingel ob Gunten `pioupiou-2029` →
+Lehn `holfuy-1850`. Solange Thun/Gunten still bleiben oder SE zeigen (Abfluss den See hinunter), kommt
+die Bise **nicht** den Thunersee herauf (31.10.: Bern NE 15/23, Thun ESE 4, Gunten still). Dazu
+`lagecheck.py bise` (Index Güttingen − Genf).
+
+**Wo entscheiden:** an der Haltestelle **Interlaken West vor dem Bus 101** — mit Holfuy Lehn/Amisbühl auf
+dem Handy. Von Bhendenchehr (Luegibrüggli) zum Bergbo ist es zu weit; lieber einen Bus/Zug später.
 
 ### Webcams (Roundshot, mit Tagesarchiv)
 - `interlaken-harderkulm` — Harder Kulm **1322 m ≈ Bergbo-Höhe**. Blick nach W zeigt den Beatenberg-Hang
@@ -77,11 +93,13 @@ Halbstundentakt ~85–90 min (24.09.: Starts 09:50 / 11:15 / 12:46).
 - **24.09.2026** (erster Tag, 3 Flüge Bergbo → Lehn): Flug 1+2 Bergwind 10–12 km/h; Flug 3 Talwind
   15–20 km/h → nur 180 m AGL über Lehn, souverän gemeistert. **Entscheid: im neuen Gebiet bewusst
   konservativ, bei Talwind nicht mehr fliegen.**
-- **30.10.2026** (Hochnebel bei Bise): Amisbühl ganztags 100 % rF, Harder bis 14 h in der Wolke, ab
+- **30.10.2026** (Hochnebel; Bise im Mittelland, in Lehn Bergwind): Amisbühl ganztags 100 % rF, Harder bis 14 h in der Wolke, ab
   ~15 h knapp unter der Basis; Nebel **hob sich nur**, löste sich nicht auf. Lehn bis 9 h NE 10–14 km/h
-  (Böen bis 26), danach E/SE 1–6, nie Talwind. **ICON-CH1 lag falsch** (Lehn WSW, Nebel ab Mittag weg).
+  (Böen bis 26), danach E/SE 1–6, nie Talwind. Bise-Index nur +1.7–2.4 hPa; Genf hatte
+  das Bise-Maximum am Nachmittag (NE 20, Böen 36), genau als Lehn still war → Lehn = Bergwind. **ICON-CH1 lag falsch** (Lehn WSW, Nebel ab Mittag weg).
 - **31.10.2026** (Stratus Basis 800–1200 m laut Segelflugprognose): Luegibrüggli nebelfrei (Sicht von
-  unten), Bergbo/Amisbühl in der Wolke, Lehn NNE 15 km/h, Böen 22 → Luegibrüggli wegen Bise im Lee.
+  unten), Bergbo/Amisbühl in der Wolke, Lehn NNE 15 km/h, Böen 22 (Bergwind) → Luegibrüggli im Lee. Bise-Index +3.1 hPa und
+  steigend, Bern NE 15/23, aber Thun/Gunten still; Lehn begann ab 08:45 abzuflauen.
   Startplatzwahl daher an die Lage gekoppelt.
 
 ---
