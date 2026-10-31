@@ -73,6 +73,18 @@ Fakten** entscheiden können, und das SHV-Formular sauber ausgefüllt vorliegt. 
     nicht an — dann ist der Wind am Landeplatz lokal.
   Die Lee-Regeln gelten für beides; der Unterschied entscheidet über den **Zeitpunkt** (Bergwind bricht
   im Tagesgang zusammen, Bise nimmt zu).
+- **Soaring-Tage (Wind gewollt, z. B. Bise am Hahnenmoospass):** Die Frage dreht sich um — reicht der
+  Wind, und ist er nicht zu stark? Prognose am Vorabend in drei Schritten:
+  1. `lagecheck.py verlauf <Stationen> --datum <heute>` und `--datum <gestern>`: Wie viel kam am Platz
+     bei welchem Bise-Index an?
+  2. `lagecheck.py bise --prognose`: Index für morgen aus dem Modell-Bodendruck. Er traf am 30./31.10.
+     auf ±0.3 hPa.
+  3. `lagecheck.py modell <lat> <lon>`: Modellwind am Pass **nur relativ** lesen (stärker oder schwächer
+     als heute?). Der Absolutwert lag am 30.10. mittags um Faktor 2 zu hoch.
+  Dazu die MeteoSchweiz-Texte («Wind in den Bergen», Gleitschirmprognose) — sie bleiben massgebend.
+- **Archiv (Pflicht nach jedem Flugtag, spätestens am Folgetag):** winds.mobi hält nur ~48 h. Darum
+  `lagecheck.py archiv <datum> <gebiet> <Stationen…> --punkt <lat,lon>` laufen lassen (gitignored
+  unter `alleinflüge/archiv/`). Die Kernzahlen kommen als Erfahrungswert in startplaetze.md.
 
 ### 4. Startplatz-Logik
 - Lee-, Volten- und Windregeln aus Tafel/Club pro Startplatz anwenden (startplaetze.md).

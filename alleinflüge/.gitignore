@@ -6,3 +6,4 @@ alleinflug*.yaml
 *.pdf
 # Ausgaben von lagecheck.py (Webcam-Kontaktbögen)
 lagecheck_out/
+archiv/

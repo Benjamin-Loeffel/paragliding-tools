@@ -37,6 +37,13 @@ Kommen als **Screenshots aus der MeteoSchweiz-App** von Benjamin (kein stabiler 
   Einzelstation `…/stations/<id>/`, Verlauf `…/stations/<id>/historic/?duration=<s>`.
 - Ideal für **Ketten**: erreicht ein grossräumiger Wind (Bise) das Gebiet, oder ist der Wind am
   Landeplatz lokal? Stationen vom Mittelland bis zum Landeplatz nebeneinander lesen.
+- Der Verlauf reicht **~48 h zurück** (danach weg). Er umfasst alle Netze, auch Holfuy (dessen Seite
+  zeigt nur heute) und die SLF-IMIS-Gipfelstationen (`slf-…`, 30-min-Werte). MeteoSchweiz-Stationen
+  liefern auch `pres.qff`, damit lässt sich der Bise-Index aus dem Archiv rechnen.
+- `lagecheck.py verlauf <ids> --datum` gibt die Stundenmatrix (Station × Stunde) aus,
+  `lagecheck.py archiv` sichert die Rohdaten eines Tages.
+- Neue Stationen finden: Umkreissuche (oben) um den Startplatz, 30 km; `short`, `alt`, Alter der
+  letzten Messung prüfen (z. B. `slf-OTT2` lieferte am 31.10. seit 27 h nichts).
 
 ## Bise-Indikatoren
 - **Druckdifferenz Nordost − Genf** (Güttingen oder Kloten minus Genf, QFF): Bise, sobald der Druck
@@ -45,6 +52,10 @@ Kommen als **Screenshots aus der MeteoSchweiz-App** von Benjamin (kein stabiler 
 - **Tagesgang** (SRF Meteo): Bise nachmittags am stärksten, nachts schwächer; Böen bis ~2–2.5× Mittel.
 - Je stärker die Bise, desto höher meist die Hochnebel-Obergrenze (SRF).
 - Abgrenzung zum Bergwind: siehe SKILL.md («Bergwind oder Bise?»).
+- **Prognose des Index:** `lagecheck.py bise --prognose` rechnet ihn aus Open-Meteo `pressure_msl`
+  (ICON-CH1/CH2) an denselben drei Punkten. Validiert: 30.10. Modell +1.5 vs. gemessen +1.0…+1.7,
+  31.10. 09 h Modell +3.1 vs. gemessen +3.0. Der Druckgradient ist verlässlicher als der Modellwind im
+  Gelände.
 - Quellen: meteoschweiz.admin.ch Blog «Bisensturm» (2023/02), srf.ch/meteo «Tagesgang der Bise»,
   meteomatics.com «wind phenomena».
 
