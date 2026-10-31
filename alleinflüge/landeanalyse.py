@@ -9,6 +9,10 @@
               ≤ 200°, Höhenabbau luvseitig, Kreis 34 m Ø) und Wind auf Volten-Höhe aus den Kreisen.
     plan      Ideale Höhen an den Eckpunkten der Volte je Gegenwind — rückwärts vom Zielpunkt
               gerechnet, kalibriert auf die eigenen Lehn-Flüge (Fahrt/Sinken je Abschnitt).
+    volten    Landevolten je Gegenwind auf der swisstopo-Karte (Endanflug ab 50 m), geflogene
+              Volten zum Vergleich darüber.
+    karte     Alle Landungen auf einer swisstopo-Karte.
+    hoehen    GPS- und Baro-Höhe des IGC an Start und Landung gegen swissALTI3D (Vario-Genauigkeit).
 
 Wind: Holfuy-2-min-Reihe aus `lagecheck.py archiv` (am Flugtag selbst sichern, Vortage gibt
 Holfuy nur noch 15-min). Der Wind am Mast (10 m) ist schwächer als auf 50–150 m AGL — die
@@ -18,6 +22,9 @@ Beispiele:
     python alleinflüge/landeanalyse.py analyse D:/.../2026-10-31-XTR-...-02.IGC --ziel lehn \
         --wind alleinflüge/archiv/2026-10-31_interlaken/roh/holfuy-1850_15min.json
     python alleinflüge/landeanalyse.py plan --gegenwind 0,5,10,15,20
+    python alleinflüge/landeanalyse.py volten --kurs 250 --seite rechts --flug <igc>...   # Talwind
+    python alleinflüge/landeanalyse.py volten --kurs 75 --seite links                     # Bergwind
+    python alleinflüge/landeanalyse.py hoehen <igc>...
 """
 
 from __future__ import annotations
@@ -82,11 +89,21 @@ def _hms(s: float) -> str:
 
 # ------------------------------------------------------------------ Wind (Holfuy-Archiv)
 
-def lade_wind(pfad: str | None) -> list[tuple[float, float, float, float]]:
-    """[(sek. Lokalzeit, Richtung aus °, Mittel km/h, Böe km/h)] aus der Holfuy-Archivdatei."""
+def lade_wind(pfad: str | None, utc_offset_h: int = 0) -> list[tuple[float, float, float, float]]:
+    """[(sek. Lokalzeit, Richtung aus °, Mittel km/h, Böe km/h)] aus der Holfuy-Archivdatei (JSON)
+    oder einer MeteoSchweiz-SMN-10-min-Datei (CSV, UTC; `lagecheck.py archiv`)."""
     if not pfad:
         return []
     out = []
+    if pfad.lower().endswith(".csv"):
+        z = Path(pfad).read_text(encoding="utf-8").splitlines()
+        k = z[0].split(";")
+        for x in (dict(zip(k, r.split(";"))) for r in z[1:]):
+            if x.get("dkl010z0") and x.get("fu3010z0"):
+                t = dt.datetime.strptime(x["reference_timestamp"], "%d.%m.%Y %H:%M")
+                out.append(((t.hour + utc_offset_h) * 3600 + t.minute * 60, float(x["dkl010z0"]),
+                            float(x["fu3010z0"]), float(x.get("fu3010z1") or x["fu3010z0"])))
+        return out
     for x in json.loads(Path(pfad).read_text(encoding="utf-8")):
         t = dt.datetime.strptime(x["zeit"], "%Y/%m/%d %H:%M:%S")
         if x.get("mittel") is not None and x.get("richtung") is not None:
@@ -167,18 +184,24 @@ def analyse(pfad: str, ziel: str, windpfad: str | None, plot: bool) -> dict:
     except ValueError:
         g = None
     q = next((j for j in range(g + 1, len(seg)) if seg[j][2] == "Quer"), None) if g is not None else None
-    e_ = max(j for j, s in enumerate(seg) if s[2] == "End")
-    # Endanflug beginnt nach der letzten Nicht-End-Phase
+    # Endanflug beginnt nach der letzten Abweichung > 90° von der Achse (S-Kurven bis 90° gehören laut
+    # Weisung zum Endanflug) beim ersten Kurs innerhalb 45°
+    rr = np.nan_to_num(rel[:td + 1], nan=0.0)
+    weg_ = np.where(rr > 90)[0]
+    e0 = (weg_[-1] if len(weg_) else 0)
+    e0 = int(e0 + np.argmax(rr[e0:] <= 45))
     ecke = {"Gegenanflug": seg[g][0] if g is not None else None,
             "Queranflug": seg[q][0] if q is not None else None,
-            "Endanflug": seg[e_][0], "Touchdown": td}
+            "Endanflug": e0, "Touchdown": td}
 
-    wind = lade_wind(windpfad)
+    wind = lade_wind(windpfad, tr.utc_offset_h)
     t_start = tr.t[ecke["Gegenanflug"]] if ecke["Gegenanflug"] is not None else tr.t[td] - 180
     w = wind_im_fenster(wind, t_start - 300, tr.t[td] + 300)
     hw = hoehenwind(tr, agl, td)
     wx = wy = 0.0
-    quelle = hw if hw else (w[:2] if w else None)  # Volten-Höhe schlägt Mast
+    gs_wind = _wind_aus_gs(tr, ecke, final)
+    # Volten-Höhe (Kreise) schlägt Gegen-/End-Grundgeschwindigkeit schlägt Mast
+    quelle = hw if hw else (gs_wind if gs_wind else (w[:2] if w else None))
     if quelle:
         zu = math.radians(quelle[0] + 180)            # Wind weht NACH
         wx, wy = quelle[1] / 3.6 * math.sin(zu), quelle[1] / 3.6 * math.cos(zu)
@@ -194,7 +217,8 @@ def analyse(pfad: str, ziel: str, windpfad: str | None, plot: bool) -> dict:
                 "gleit": weg / max(0.1, agl[a] - agl[b]), "luft": math.hypot(ax, ay) * 3.6,
                 "vorhalt": float(crab)}
 
-    erg = {"datei": Path(pfad).name, "final_kurs": final, "wind": w, "hoehenwind": hw, "gnss_off": gnss_off,
+    erg = {"datei": Path(pfad).name, "final_kurs": final, "wind": w, "hoehenwind": hw, "gs_wind": gs_wind,
+           "td_agl_e": float(agl[e0]), "e_dist": float(math.hypot(dx[e0], dy[e0])), "gnss_off": gnss_off,
            "regeln": pruefregeln(tr, kurs, final, ecke, td, vor, rechts, quelle, (TE, TN), R),
            "td_zeit": _hms(tr.t[td]), "td_vor": float(vor[td]), "td_rechts": float(rechts[td]),
            "td_dist": float(math.hypot(dx[td], dy[td])), "radius": R,
@@ -216,7 +240,22 @@ def analyse(pfad: str, ziel: str, windpfad: str | None, plot: bool) -> dict:
     _drucke(erg)
     if plot:
         _plot(tr, agl, vor, rechts, ecke, td, erg, ziel)
+    erg["_intern"] = (tr, agl, ecke, td)
     return erg
+
+
+def _wind_aus_gs(tr: Track, ecke: dict, final: float):
+    """Fallback ohne Kreise: Achswind aus Gegen- und Endanflug-Grundgeschwindigkeit.
+
+    GS_Gegen = V_G + u, GS_End = V_E − u mit den Fahrten aus KALIB → u = (GS_G − GS_E − V_G + V_E) / 2.
+    Nur die Komponente längs der Achse; Rückgabe (aus °, km/h) wie Gegenwind genau von vorn.
+    """
+    g, q, e0, td = ecke["Gegenanflug"], ecke["Queranflug"], ecke["Endanflug"], ecke["Touchdown"]
+    if g is None or q is None or td - e0 < 8:
+        return None
+    gs = lambda a, b: math.hypot(tr.e[b] - tr.e[a], tr.n[b] - tr.n[a]) / max(1.0, tr.t[b] - tr.t[a]) * 3.6
+    u = (gs(g, q) - gs(e0, td) - KALIB["Gegen"][0] + KALIB["End"][0]) / 2
+    return (final if u >= 0 else (final + 180) % 360, abs(u))
 
 
 def hoehenwind(tr: Track, agl: np.ndarray, td: int, von: float = 120, bis: float = 450):
@@ -256,7 +295,8 @@ def pruefregeln(tr, kurs, final, ecke, td, vor, rechts, wind, ziel_en, radius) -
     # S-Kurven im Endanflug max. 90° von der Achse
     e0 = ecke["Endanflug"]
     se = np.nanmax(np.abs(rel[e0:td + 1]))
-    out.append(("S-Kurven Endanflug ≤ 90°", bool(se <= 90), f"max. {se:.0f}°"))
+    out.append(("S-Kurven Endanflug ≤ 90°", bool(se <= 90),
+                f"max. {se:.0f}° (Endanflug = ab der letzten Abweichung > 90°)"))
     # Kurven im Queranflug max. 200° (grösste Drehung in eine Richtung am Stück)
     q0 = ecke["Queranflug"]
     if q0 is not None:
@@ -297,6 +337,10 @@ def _drucke(erg: dict) -> None:
         print(f"   Wind Volten-Höhe (aus {hw[3]} Kreis-Fenstern 120–450 m AGL): aus {hw[0]:.0f}° {hw[1]:.1f} km/h, "
               f"Luft im Kreis {hw[2]:.0f} km/h -> Gegenwind im Endanflug "
               f"{hw[1] * math.cos(math.radians(hw[0] - erg['final_kurs'])):+.1f} km/h")
+    if not hw and erg["gs_wind"]:
+        gw = erg["gs_wind"]
+        print(f"   Wind aus Gegen-/End-Grundgeschw. (keine Kreise, nur Achskomponente): "
+              f"Gegenwind im Endanflug {gw[1] * math.cos(math.radians(gw[0] - erg['final_kurs'])):+.1f} km/h")
     print("   SHV-Prüfregeln (Weisung Pilot GS 07/2025, Ziff. 5.7):")
     for name, ok, txt in erg["regeln"]:
         print(f"     {'✓' if ok else '✗'} {name:32s} {txt}")
@@ -338,6 +382,7 @@ def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel):
     ax1.add_patch(plt.Circle((0, 0), R, fill=False, ls="--", lw=0.7, color="crimson"))
     ax1.plot(0, 0, "+", color="crimson", ms=10)
     ax1.set_aspect("equal")
+    _karte(ax1, ziel, *_rand(ex[a:b], ny[a:b], 40))
     w = erg["wind"]
     if w:                                             # Windpfeil: weht NACH (aus w[0])
         zu = math.radians(w[0] + 180)
@@ -369,16 +414,267 @@ def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel):
     print(f"   Plot: {ziel_png}")
 
 
+# ------------------------------------------------------------------ Karte
+
+def _rand(x, y, rand: float):
+    """Kartenausschnitt (x0, x1, y0, y1) relativ zum Ziel um die Punkte, mit Rand in m."""
+    return (float(np.min(x)) - rand, float(np.max(x)) + rand, float(np.min(y)) - rand, float(np.max(y)) + rand)
+
+
+def _karte(ax, ziel: str, x0: float, x1: float, y0: float, y1: float,
+           ebene: str = "ch.swisstopo.pixelkarte-farbe", alpha: float = 0.8) -> None:
+    """swisstopo-Karte (WMS, LV95) als Hintergrund; Achsen in m relativ zum Zielpunkt. Cache in OUT/karten."""
+    import matplotlib.image as mpimg
+    import requests
+    TE, TN = ZIELE[ziel][:2]
+    x0, x1 = math.floor(x0 / 10) * 10, math.ceil(x1 / 10) * 10
+    y0, y1 = math.floor(y0 / 10) * 10, math.ceil(y1 / 10) * 10
+    px = max(0.5, max(x1 - x0, y1 - y0) / 4000)          # m/Pixel, max. 4000 px
+    w, h = int((x1 - x0) / px), int((y1 - y0) / px)
+    f = OUT / "karten" / f"{ziel}_{ebene.split('.')[-1]}_{x0}_{x1}_{y0}_{y1}_{w}.png"
+    if not f.exists():
+        f.parent.mkdir(parents=True, exist_ok=True)
+        r = requests.get("https://wms.geo.admin.ch/", timeout=60, params={
+            "SERVICE": "WMS", "VERSION": "1.3.0", "REQUEST": "GetMap", "LAYERS": ebene, "STYLES": "",
+            "CRS": "EPSG:2056", "BBOX": f"{TE + x0},{TN + y0},{TE + x1},{TN + y1}",
+            "WIDTH": w, "HEIGHT": h, "FORMAT": "image/png"})
+        if r.status_code != 200 or not r.headers.get("content-type", "").startswith("image"):
+            print(f"   Karte nicht geladen ({r.status_code})")
+            return
+        f.write_bytes(r.content)
+    ax.imshow(mpimg.imread(f), extent=(x0, x1, y0, y1), zorder=-1, alpha=alpha)
+    ax.set_xlim(x0, x1)
+    ax.set_ylim(y0, y1)
+    ax.text(0.995, 0.005, "Karte © swisstopo", transform=ax.transAxes, ha="right", va="bottom", fontsize=6)
+
+
+def _aus_achse(vor, rechts, kurs: float):
+    """(vor, rechts) im Endanflug-System -> (Ost, Nord) relativ zum Ziel (Umkehrung von analyse)."""
+    ux, uy = math.sin(math.radians(kurs)), math.cos(math.radians(kurs))
+    vor, rechts = np.asarray(vor, float), np.asarray(rechts, float)
+    return -vor * ux + rechts * uy, -vor * uy - rechts * ux
+
+
+def _still(igc: str, ziel: str) -> dict:
+    import contextlib
+    import io
+    with contextlib.redirect_stdout(io.StringIO()):
+        return analyse(igc, ziel, None, False)
+
+
+def volten(winde: list[float], kurs: float, seite: str, faktor: float, igcs: list[str], ziel: str,
+           ebene: str) -> None:
+    """Landevolten je Gegenwind auf der swisstopo-Karte, Endanflug ab 50 m AGL (Planmodell).
+
+    Geometrie wie geflogen: Gegenanflug 210 m neben der Achse ab 200 m hinter dem Punkt (Positionsraum
+    luvseitig), Queranflug quer zur Achse, Endanflug-Länge je Wind = Gleitweg ab 50 m (KALIB End).
+    """
+    from thermalmodel.plotstyle import use
+    plt = use()
+    sg = 1 if seite == "rechts" else -1
+    Q, P = GEOM["Quer"], 200.0
+    fig, ax = plt.subplots(figsize=(15, 12))
+    farben = plt.get_cmap("plasma")(np.linspace(0.05, 0.85, len(winde)))
+    pkt = []
+    for j, (u, c) in enumerate(sorted(zip(winde, farben), key=lambda z: -z[0])):
+        r = plan_rechnen(u)
+        if not r["ok"]:
+            continue
+        le = r["l_e50"]
+        h_q = 50 + Q * KALIB["Quer"][1] / (math.sqrt(max(0.01, KALIB["Quer"][0] ** 2 - u ** 2)) / 3.6)
+        h_g = h_q + (P + le) * KALIB["Gegen"][1] / ((KALIB["Gegen"][0] + u) / 3.6)
+        x, y = _aus_achse([-P, le, le, 0], [sg * Q, sg * Q, 0, 0], kurs)
+        pkt += list(zip(x, y))
+        ax.plot(x, y, "-", color=c, lw=2.2, zorder=3,
+                label=f"Gegenwind {u:.0f} km/h (Mast ≈ {u / faktor:.0f}): Gegen {h_g:.0f} m · Quer {h_q:.0f} m"
+                      f" · End 50 m bei {le:.0f} m")
+        ax.plot(x[:3], y[:3], "o", color=c, ms=6, mec="k", mew=0.5, zorder=4)
+        for xi, yi, hh, dy in ((x[0], y[0], h_g, 5 + 11 * j), (x[1], y[1], h_q, 5), (x[2], y[2], 50, -12)):
+            ax.annotate(f"{hh:.0f}", (xi, yi), xytext=(5, dy), textcoords="offset points",
+                        fontsize=8, color=c, fontweight="bold", zorder=5)
+    # Positionsraum (Höhenabbau, Achten) luvseitig hinter dem Punkt
+    cx, cy = _aus_achse([-P - 70], [sg * Q * 0.75], kurs)
+    ax.add_patch(plt.Circle((cx[0], cy[0]), 90, color="tab:green", alpha=0.15, zorder=2))
+    ax.text(cx[0], cy[0], "Positionsraum\n(luvseitig)", ha="center", va="center", fontsize=8, color="darkgreen")
+    TE, TN = ZIELE[ziel][:2]
+    for igc in igcs:                                # geflogene Volten darüber
+        tr, agl, ecke, td = _still(igc, ziel)["_intern"]
+        a = max(0, (ecke["Gegenanflug"] or td - 180) - 30)
+        ax.plot(tr.e[a:td + 3] - TE, tr.n[a:td + 3] - TN, "-", color="k", lw=0.8, alpha=0.7, zorder=3)
+        for k in ("Gegenanflug", "Queranflug", "Endanflug"):
+            i = ecke[k]
+            if i is not None:
+                ax.plot(tr.e[i] - TE, tr.n[i] - TN, "s", ms=4, color="k", zorder=4)
+                ax.annotate(f"{agl[i]:.0f}", (tr.e[i] - TE, tr.n[i] - TN), xytext=(-16, 4),
+                            textcoords="offset points", fontsize=7)
+    if igcs:
+        ax.plot([], [], "-s", color="k", lw=0.8, ms=4,
+                label="geflogen: " + ", ".join(f"{Path(i).stem[:10]} #{Path(i).stem[-1]}" for i in igcs)
+                      + " (Eckpunkte m AGL)")
+    R = ZIELE[ziel][3]
+    ax.add_patch(plt.Circle((0, 0), R, fill=False, lw=1.2, color="crimson", zorder=5))
+    ax.add_patch(plt.Circle((0, 0), 17, fill=False, lw=0.8, ls="--", color="crimson", zorder=5))
+    wx, wy = _aus_achse([-P - 70], [-sg * 120], kurs)  # Windpfeil, weht entgegen dem Endanflug
+    zu = math.radians(kurs + 180)
+    ax.annotate("", (wx[0] + 80 * math.sin(zu), wy[0] + 80 * math.cos(zu)), (wx[0], wy[0]),
+                arrowprops=dict(arrowstyle="-|>", color="steelblue", lw=2.5))
+    ax.text(wx[0], wy[0] + 15, f"Wind aus {kurs % 360:.0f}°", color="steelblue", fontsize=9, ha="center")
+    ax.set_aspect("equal")
+    xs, ys = zip(*pkt)
+    _karte(ax, ziel, *_rand(np.r_[xs, cx, wx], np.r_[ys, cy, wy], 120), ebene=ebene)
+    ax.set_xlabel("Osten [m] ab Zielpunkt")
+    ax.set_ylabel("Norden [m] ab Zielpunkt")
+    ax.set_title(f"Landevolten Lehn — {'Rechts' if sg > 0 else 'Links'}volte, Endanflug {kurs:.0f}°, "
+                 f"Endanflug ab 50 m AGL; Zahlen = Höhe AGL am Eckpunkt (Planmodell, 7 Flüge)", fontsize=10)
+    ax.legend(loc="lower left", fontsize=7.5, framealpha=0.9)
+    OUT.mkdir(exist_ok=True)
+    f = OUT / f"volten_lehn_{kurs:.0f}_{seite}.png"
+    fig.savefig(f)
+    print(f"Plot: {f}")
+
+
+def karte_alle(igcs: list[str], ziel: str, ebene: str) -> None:
+    """Alle Landungen (letzte Volte bis Touchdown) auf einer Karte, Farbe je Flug."""
+    from thermalmodel.plotstyle import use
+    plt = use()
+    TE, TN, _, R = ZIELE[ziel]
+    fig, ax = plt.subplots(figsize=(15, 12))
+    farben = plt.get_cmap("tab10")(np.arange(len(igcs)) % 10)
+    alle_x, alle_y = [0.0], [0.0]
+    for igc, c in zip(igcs, farben):
+        e = _still(igc, ziel)
+        tr, agl, ecke, td = e["_intern"]
+        a = max(0, (ecke["Gegenanflug"] or td - 180) - 30)
+        x, y = tr.e[a:td + 3] - TE, tr.n[a:td + 3] - TN
+        alle_x += list(x)
+        alle_y += list(y)
+        ax.plot(x, y, "-", color=c, lw=1.4,
+                label=f"{Path(igc).stem[:10]} #{Path(igc).stem[-1]}: Endanflug {e['final_kurs']:.0f}°, ab "
+                      f"{agl[ecke['Endanflug']]:.0f} m / {e['e_dist']:.0f} m, "
+                      f"{abs(e['td_vor']):.0f} m zu {'kurz' if e['td_vor'] > 0 else 'weit'}")
+        for k in ("Gegenanflug", "Queranflug", "Endanflug"):
+            i = ecke[k]
+            if i is not None:
+                ax.plot(tr.e[i] - TE, tr.n[i] - TN, "o", ms=5, color=c, mec="k", mew=0.5)
+                ax.annotate(f"{agl[i]:.0f}", (tr.e[i] - TE, tr.n[i] - TN), xytext=(4, 4),
+                            textcoords="offset points", fontsize=7, color=c, fontweight="bold")
+        ax.plot(tr.e[td] - TE, tr.n[td] - TN, "x", ms=8, mew=2, color=c)
+    ax.add_patch(plt.Circle((0, 0), R, fill=False, lw=1.2, color="crimson", zorder=5))
+    ax.set_aspect("equal")
+    _karte(ax, ziel, *_rand(alle_x, alle_y, 60), ebene=ebene)
+    ax.set_xlabel("Osten [m] ab Zielpunkt")
+    ax.set_ylabel("Norden [m] ab Zielpunkt")
+    ax.set_title("Landungen Lehn — Volten bis Bodennähe (×), Zahlen = Höhe AGL an Gegen/Quer/End", fontsize=10)
+    ax.legend(loc="lower left", fontsize=7.5, framealpha=0.9)
+    OUT.mkdir(exist_ok=True)
+    f = OUT / "landungen_lehn_alle.png"
+    fig.savefig(f)
+    print(f"Plot: {f}")
+
+
+# ------------------------------------------------------------------ Höhen-Check
+
+def gelaendehoehe(e: float, n: float) -> float:
+    """swisstopo-Geländehöhe (swissALTI3D, LN02) an einem LV95-Punkt — wie Rechtsklick auf map.geo.admin.ch."""
+    import requests
+    r = requests.get("https://api3.geo.admin.ch/rest/services/height",
+                     params={"easting": f"{e:.2f}", "northing": f"{n:.2f}", "sr": 2056}, timeout=30)
+    return float(r.json()["height"])
+
+
+def _smn_reihe(datum: dt.date, abk: str = "INT") -> list[dict]:
+    """SMN-10-min-Zeilen aus dem Tagesarchiv (lagecheck.py archiv), sonst direkt von MeteoSchweiz."""
+    arch = sorted((Path(__file__).resolve().parent / "archiv").glob(f"{datum}_*/roh/meteoswiss-{abk}_10min.csv"))
+    if arch:
+        txt = arch[0].read_text(encoding="utf-8")
+    else:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from lagecheck import _smn_tag_csv
+        txt = _smn_tag_csv(abk, datum)
+    z = txt.splitlines()
+    return [dict(zip(z[0].split(";"), r.split(";"))) for r in z[1:]] if z else []
+
+
+def _smn_wert(reihe: list[dict], t_lokal: float, utc_off: int, feld: str) -> float | None:
+    """Wert des 10-min-Intervalls, das t_lokal enthält (Zeitstempel = Intervallende, UTC)."""
+    best = None
+    for x in reihe:
+        t = dt.datetime.strptime(x["reference_timestamp"], "%d.%m.%Y %H:%M")
+        s_ = (t.hour + utc_off) * 3600 + t.minute * 60
+        if s_ >= t_lokal and x.get(feld):
+            if best is None or s_ < best[0]:
+                best = (s_, float(x[feld]))
+    return best[1] if best else None
+
+
+def _ruhe(tr: Track, wo: str, n: int = 10) -> slice:
+    """Ruhephase am Boden: vor dem Start (Grundgeschw. < 3 km/h) bzw. die letzten n Fixes."""
+    if wo == "landung":
+        return slice(len(tr.t) - n, None)
+    gs = np.r_[0, np.hypot(np.diff(tr.e), np.diff(tr.n)) / np.maximum(1, np.diff(tr.t))] * 3.6
+    los = int(np.argmax(gs > 8)) or n
+    return slice(max(0, los - n - 3), max(1, los - 3))
+
+
+def hoehen(igcs: list[str], ziel: str) -> None:
+    """GPS- und Baro-Höhe des IGC an Start und Landung gegen swissALTI3D.
+
+    Baro im IGC = ISA-Druckhöhe (HFALP:ISA, 1013.25 hPa) -> mit dem QNH von Interlaken (SMN INT) auf
+    Meereshöhe umgerechnet = was ein auf QNH gestelltes Vario zeigt. Die Höhendifferenz Start -> Landung
+    sagt, wie gut ein am Start auf die richtige Höhe gestelltes Vario bei der Landung stimmt.
+    Gerät am Piloten: ~1 m über Boden (stehend/sitzend) ist nicht abgezogen.
+    """
+    print("Flug           Ort      Gelände  GPS (Δ)          Baro QNH (Δ)     QNH     T INT")
+    zeilen = []
+    for igc in igcs:
+        tr = lade_igc(igc)
+        reihe = _smn_reihe(tr.datum)
+        erg = {}
+        for wo in ("start", "landung"):
+            sl = _ruhe(tr, wo)
+            e, n = float(np.median(tr.e[sl])), float(np.median(tr.n[sl]))
+            t = float(np.median(tr.t[sl]))
+            gel = gelaendehoehe(e, n)
+            gps = float(np.median(tr.gnss[sl]))
+            isa = float(np.median(tr.baro[sl]))
+            qnh = _smn_wert(reihe, t, tr.utc_offset_h, "pp0qnhs0")
+            temp = _smn_wert(reihe, t, tr.utc_offset_h, "tre200s0")
+            p = 1013.25 * (1 - isa / 44330.8) ** 5.25588            # Druck aus ISA-Höhe
+            baro = 44330.8 * (1 - (p / qnh) ** 0.190263) if qnh else float("nan")
+            erg[wo] = (gel, gps, baro, isa, qnh, temp, t)
+            print(f"{Path(igc).stem[:10]} #{Path(igc).stem[-1]}  {wo:8s} {gel:7.1f}  {gps:7.1f} ({gps - gel:+5.1f})  "
+                  f"{baro:7.1f} ({baro - gel:+5.1f})  {qnh or 0:6.1f}  {temp if temp is not None else float('nan'):4.1f}")
+        (g0, gps0, b0, i0, q0, t0, s0), (g1, gps1, b1, i1, q1, t1, s1) = erg["start"], erg["landung"]
+        d_true, d_gps, d_isa = g0 - g1, gps0 - gps1, i0 - i1
+        # Temperaturkorrektur: Schicht-Mitteltemperatur aus INT + 6.5 K/km gegenüber ISA
+        t_mittel = (t1 if t1 is not None else 15) + 273.15 - 0.0065 * d_true / 2
+        t_isa = 288.15 - 0.0065 * (i0 + i1) / 2
+        d_korr = d_isa * t_mittel / t_isa
+        zeilen.append((Path(igc).stem, d_true, d_gps, d_isa, d_korr, (s1 - s0) / 60, (q1 or 0) - (q0 or 0)))
+        print(f"   Höhendifferenz Start->Landung: Gelände {d_true:.1f} m | GPS {d_gps:.1f} ({d_gps - d_true:+.1f}) | "
+              f"Baro {d_isa:.1f} ({d_isa - d_true:+.1f}) | Baro temperaturkorrigiert {d_korr:.1f} "
+              f"({d_korr - d_true:+.1f}) | Flugzeit {(s1 - s0) / 60:.0f} min, QNH-Änderung {(q1 or 0) - (q0 or 0):+.1f} hPa")
+    if zeilen:
+        a = np.array([[z[2] - z[1], z[3] - z[1], z[4] - z[1]] for z in zeilen])
+        print(f"Mittel Fehler Start->Landung: GPS {a[:, 0].mean():+.1f} m (±{a[:, 0].std():.1f}), "
+              f"Baro {a[:, 1].mean():+.1f} m (±{a[:, 1].std():.1f}), Baro T-korr. {a[:, 2].mean():+.1f} m")
+
+
 # ------------------------------------------------------------------ Plan
 
-# Kalibrierung aus den Lehn-Flügen 31.10.2026 (Alpha 6 24, Höhenwind aus den Kreisen 8.7/9.3 km/h):
-#   Endanflug  Luft 24–29 km/h, Sinken 1.70/1.85 m/s (angebremst)
-#   Queranflug Luft 30 km/h,    Sinken 1.68 m/s
-#   Gegenanflug Luft 29–31 km/h, Sinken 1.12/1.84 m/s
-#   Geometrie: Endanflug 135/153 m, Queranflug (Abstand Gegenanflug–Achse) 204/231 m,
-#   Gegenanflug ab Positionsraum 373/325 m. Nachgerechnet trifft das Flug 2 auf ±3 m (End/Quer).
-KALIB = {"End": (26.5, 1.80), "Quer": (30.0, 1.70), "Gegen": (30.0, 1.40)}
+# Kalibrierung aus 7 Lehn-Flügen (Alpha 6 24; 24.09., 25.09., 31.10.2026), Gegenwind im Endanflug
+# 0–15 km/h (Höhenwind aus den Kreisen, 24.09. Flug 3 aus Gegen-/End-Grundgeschwindigkeit):
+#   Endanflug   Luft 23–29 km/h (Mittel 25.7), Sinken 1.24–1.85 m/s (Median 1.36; 31.10.: 1.70/1.85)
+#   Queranflug  Sinken 1.0–1.8 m/s (Median 1.6);  Gegenanflug Luft 29–35 km/h, Sinken 1.0–2.3 (Median 1.4)
+#   Geometrie: Endanflug 118–289 m (Median 153), Queranflug 200–230 m, Gegenanflug 270–370 m.
+#   6 von 7 Landungen lagen 6–28 m zu kurz (Median 9.5 m) -> Plan rechnet mit dem hohen Sinken (1.8),
+#   überschüssige Höhe wird mit S-Kurven abgebaut; das Sinken in ruhiger Luft (1.35) zeigt die Spanne.
+KALIB = {"End": (25.5, 1.80), "Quer": (30.0, 1.60), "Gegen": (30.0, 1.40)}
+END_RUHIG = (25.5, 1.35)
 GEOM = {"End": 145.0, "Quer": 210.0, "Gegen": 350.0}
+# Geflogen (Gegenwind Volten-Höhe km/h, Endanflug ab m AGL, Distanz zum Punkt m, Touchdown zu kurz m)
+FLUEGE = [(9.0, 99, 289, 9.5), (0.4, 52, 186, 10.1), (14.6, 50, 118, 14.3), (4.9, 54, 260, 7.4),
+          (3.7, 32, 123, -5.6), (7.1, 40, 135, 27.7), (7.9, 49, 153, 5.9)]
 # Annahme, nicht gemessen: Endanflug im Trimm (Hände oben) für starken Wind
 TRIMM = (37.0, 1.20)
 
@@ -402,23 +698,24 @@ def plan_rechnen(u: float, kal: dict = KALIB, geom: dict = GEOM, end=None) -> di
 
 def plan(winde: list[float], faktor: float, png: bool) -> None:
     """Tabelle + Grafik: ideale Höhen je Gegenwind (Volten-Höhe), dazu Mast-Äquivalent."""
-    print("Kalibrierung Lehn 31.10.2026 (Alpha 6 24): " + ", ".join(
+    print("Kalibrierung Lehn, 7 Flüge 24.09.–31.10.2026 (Alpha 6 24): " + ", ".join(
         f"{k} {v:.0f} km/h / {w:.2f} m/s" for k, (v, w) in KALIB.items()))
     print(f"Geometrie: Endanflug {GEOM['End']:.0f} m, Queranflug {GEOM['Quer']:.0f} m, "
-          f"Gegenanflug {GEOM['Gegen']:.0f} m. Höhenwind ≈ Mast × {faktor:.1f} (31.10.: 1.1–1.4).")
+          f"Gegenanflug {GEOM['Gegen']:.0f} m. Höhenwind ≈ Mast Lehn × {faktor:.1f} (31.10.: 1.1–1.4).")
     print("Gegenwind  Mast≈  | Beginn Gegen  Beginn Quer  Beginn End | GS End  GZ Grund | Endanflug-Länge "
-          "ab 50 m | Vorhalt Quer | End im Trimm*: Höhe")
+          "ab 50 m | Vorhalt Quer | End ruhige Luft | End im Trimm*")
     rows = []
     for u in sorted(set(winde)):
-        r, t = plan_rechnen(u), plan_rechnen(u, end=TRIMM)
+        r, t, q = plan_rechnen(u), plan_rechnen(u, end=TRIMM), plan_rechnen(u, end=END_RUHIG)
         rows.append((r, t))
         if not r["ok"]:
             print(f"  {u:4.0f}    {u / faktor:4.0f}   | angebremst kein Vorwärtskommen — "
                   f"Trimm: Endanflug ab {t['h_e']:.0f} m"); continue
         print(f"  {u:4.0f}    {u / faktor:4.0f}   |   {r['h_g']:5.0f} m      {r['h_q']:5.0f} m    {r['h_e']:5.0f} m "
               f"|  {r['gs_e']:4.0f}    {r['gz_e']:4.1f}   |     {r['l_e50']:4.0f} m          |    {r['vorhalt']:3.0f}°"
-              f"       |  {t['h_e']:4.0f} m" + ("   ⚠ GS < 12 km/h: Bremse lösen, Trimm-Spalte" if r["gs_e"] < 12 else ""))
-    print("Gemessen nur bei 7–9 km/h Gegenwind (2 Flüge); die Zeilen weit davon sind extrapoliert.")
+              f"       |     {q['h_e']:4.0f} m     |  {t['h_e']:4.0f} m" + ("   ⚠ GS < 12 km/h: Bremse lösen, Trimm-Spalte" if r["gs_e"] < 12 else ""))
+    print("Gemessen bei 0–15 km/h Gegenwind (7 Flüge); darüber extrapoliert. Beginn End = mit hohem Sinken "
+          "(1.8 m/s, sicher), «ruhige Luft» = 1.35 m/s: dazwischen liegt die Spanne, die du mit S-Kurven ausgleichst.")
     print("* Trimm-Endanflug: Fahrt 37 km/h / Sinken 1.2 m/s ist eine ANNAHME (keine Messung) — "
           "mit einem Trimm-Gleitflug in Lehn kalibrieren.")
     if png:
@@ -436,8 +733,12 @@ def _plan_png(rows, faktor):
         a1.plot(u, [r[k] for r in ok], "o-", ms=3, color=c, label=lab)
     a1.plot([t["u"] for _, t in rows if t["ok"]], [t["h_e"] for _, t in rows if t["ok"]], "--",
             color="tab:red", lw=0.8, label="Beginn Endanflug im Trimm (Annahme)")
-    a1.scatter([7.1, 7.9], [40, 49], marker="x", color="k", zorder=5, label="geflogen 31.10. (Endanflug)")
-    a1.scatter([7.1, 7.9], [117, 96], marker="+", color="k", zorder=5, label="geflogen 31.10. (Queranflug)")
+    a1.plot([q["u"] for q in (plan_rechnen(r["u"], end=END_RUHIG) for r in ok)],
+            [plan_rechnen(r["u"], end=END_RUHIG)["h_e"] for r in ok], ":", color="tab:red", lw=0.8,
+            label=f"Beginn Endanflug, ruhige Luft ({END_RUHIG[1]} m/s)")
+    a1.scatter([f[0] for f in FLUEGE], [f[1] * GEOM["End"] / f[2] for f in FLUEGE], c=[f[3] for f in FLUEGE],
+               cmap="coolwarm", vmin=-30, vmax=30, marker="o", edgecolors="k", zorder=5,
+               label=f"geflogen, Endanflug auf {GEOM['End']:.0f} m skaliert (Farbe: rot = zu kurz)")
     a1.set_xlabel(f"Gegenwind im Endanflug auf Volten-Höhe [km/h]  (Mast ≈ ÷ {faktor:.1f})")
     a1.set_ylabel("Höhe AGL [m]")
     a1.set_title(f"Lehn: Eckpunkt-Höhen (Endanflug {GEOM['End']:.0f} m, Queranflug {GEOM['Quer']:.0f} m)")
@@ -447,7 +748,7 @@ def _plan_png(rows, faktor):
     a2.set_ylabel("Distanz zum Punkt [m]")
     a2.set_title("Wo einkurven, wenn der Endanflug auf 50 m AGL beginnt (angebremst)")
     a2.grid(lw=0.3)
-    fig.suptitle("Landeeinteilung Lehn — kalibriert auf Alpha 6 24, 31.10.2026 (2 Flüge)")
+    fig.suptitle("Landeeinteilung Lehn — kalibriert auf Alpha 6 24, 7 Flüge 24.09.–31.10.2026")
     OUT.mkdir(exist_ok=True)
     f = OUT / "landeplan_lehn.png"
     fig.savefig(f)
@@ -462,14 +763,38 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("analyse"); a.add_argument("igc", nargs="+")
     a.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
-    a.add_argument("--wind", help="Holfuy-Archiv-JSON (lagecheck.py archiv, *_15min.json)")
+    a.add_argument("--wind", help="Holfuy-Archiv-JSON (*_15min.json) oder SMN-CSV (*_10min.csv) aus lagecheck.py archiv")
     a.add_argument("--kein-plot", action="store_true")
     p = sub.add_parser("plan")
     p.add_argument("--gegenwind", default="0,2,4,6,8,10,12,14,16,18,20",
                    help="Gegenwind im Endanflug auf Volten-Höhe, km/h (Liste)")
     p.add_argument("--faktor", type=float, default=1.3, help="Höhenwind / Mastwind")
     p.add_argument("--kein-plot", action="store_true")
+    v = sub.add_parser("volten", help="Landevolten je Gegenwind auf der swisstopo-Karte")
+    v.add_argument("--gegenwind", default="0,5,10,15", help="Gegenwind auf Volten-Höhe, km/h (Liste)")
+    v.add_argument("--kurs", type=float, default=250, help="Endanflug-Kurs ° (31.10.: 250 = gegen WSW-Wind)")
+    v.add_argument("--seite", choices=("rechts", "links"), default="rechts", help="Rechts-/Linksvolte")
+    v.add_argument("--faktor", type=float, default=1.3, help="Höhenwind / Mastwind")
+    v.add_argument("--flug", nargs="*", default=[], help="geflogene IGC zum Vergleich darüberlegen")
+    v.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
+    v.add_argument("--ebene", default="ch.swisstopo.pixelkarte-farbe", help="WMS-Ebene, z. B. ch.swisstopo.swissimage")
+    k = sub.add_parser("karte", help="alle Landungen auf einer Karte")
+    k.add_argument("igc", nargs="+")
+    k.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
+    k.add_argument("--ebene", default="ch.swisstopo.pixelkarte-farbe")
+    h = sub.add_parser("hoehen", help="GPS-/Baro-Höhe an Start und Landung gegen swissALTI3D")
+    h.add_argument("igc", nargs="+")
+    h.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
     x = ap.parse_args(argv)
+    if x.cmd == "hoehen":
+        hoehen(x.igc, x.ziel)
+        return 0
+    if x.cmd == "volten":
+        volten([float(w) for w in x.gegenwind.split(",")], x.kurs, x.seite, x.faktor, x.flug, x.ziel, x.ebene)
+        return 0
+    if x.cmd == "karte":
+        karte_alle(x.igc, x.ziel, x.ebene)
+        return 0
     if x.cmd == "analyse":
         for f in x.igc:
             analyse(f, x.ziel, x.wind, not x.kein_plot)

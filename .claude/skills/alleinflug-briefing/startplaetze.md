@@ -29,8 +29,9 @@ Für alle Plätze gilt laut Tafel: **starke Talwinde bei labilen NW-Lagen ab Mit
   DCI: nur gelb markierte Fläche (orange Eckpunkte), umliegendes Ackerland nicht betreten.
 - **Zielpunkt Lehn** = Mitte des gemähten **Zielkreises r = 15 m** (im Orthofoto sichtbar; Punkt von
   Benjamin auf map.geo.admin.ch gesetzt): LV95 2'629'453.66 / 1'170'022.09,
-  565.1 m (46.680774 / 7.823607). Landeanalyse: `alleinflüge/landeanalyse.py analyse <igc> --ziel lehn
-  --wind <archiv>/roh/holfuy-1850_15min.json`.
+  565.1 m (46.680774 / 7.823607; swissALTI3D 564.6–565.0 an den Landepunkten). Landeanalyse:
+  `alleinflüge/landeanalyse.py analyse <igc> --ziel lehn --wind <archiv>/roh/holfuy-1850_15min.json`
+  (ältere Tage: `meteoswiss-INT_10min.csv`, aber INT ist für Lehn nicht repräsentativ).
 - B Höhematte 568 m: Talwind → Linksvolte, Bergwind → Rechtsvolte; starke Turbulenzen bei labiler Luft
   oder starkem Talwind; sofort räumen, kein Groundhandling.
 - C Flugplatz 575 m: **nur Notlandeplatz**, im Sperrgebiet des Heliports.
@@ -49,7 +50,19 @@ Benjamins Prüfung: **6.11.2026 in Lehn**. Was für die Landeeinteilung zählt:
 - Am Start wird der Schirm im **zugelassenen Gewichtsbereich** geprüft (Ziff. 5.2).
 
 Die Regeln prüft `landeanalyse.py analyse`. Die Eckpunkt-Höhen je Wind liefert
-`landeanalyse.py plan`.
+`landeanalyse.py plan`, als Volten auf der swisstopo-Karte `landeanalyse.py volten` (Talwind:
+`--kurs 250 --seite rechts`, Bergwind: `--kurs 75 --seite links`).
+
+**Höhenmesser (XC Tracer Maxx III, `landeanalyse.py hoehen`, 7 Flüge):** IGC-Baro = ISA-Druckhöhe
+(`HFALP:ISA`), GPS = Meereshöhe (`HFALG:GEO`).
+- **GPS** am Boden in Lehn +0.4…+5 m über swissALTI3D (Gerät ~1 m über Boden), am Start +1…+10 m.
+  Höhendifferenz Start → Landung auf ±5 m richtig.
+- **Baro mit QNH Interlaken** zeigt in Lehn immer **17–19 m zu wenig** (Sensor-Offset, alle 7 Flüge).
+- **Baro am Start richtig gestellt**: die Höhendifferenz bis Lehn stimmt nur auf −10…+17 m, weil die
+  Luft wärmer/kälter als ISA ist (September warm: Vario zeigt in Lehn 8–17 m zu viel; 31.10. kühl:
+  3–10 m zu wenig).
+- Für die Volte also: **Baro-Höhe in Lehn vor dem Hochfahren auf 565 m stellen** (danach nur noch
+  Druckänderung, ~0–1 hPa ≈ 0–8 m in 1–3 h) oder GPS-Höhe/AGL anzeigen.
 
 ### Luftraum
 TMA HX Meiringen — Status per Tonband **0800 496 347** (Updates 07:30, 13:15, 17:05). Violette Zonen
@@ -113,6 +126,13 @@ Halbstundentakt ~85–90 min (24.09.: Starts 09:50 / 11:15 / 12:46).
 - **24.09.2026** (erster Tag, 3 Flüge Bergbo → Lehn): Flug 1+2 Bergwind 10–12 km/h; Flug 3 Talwind
   15–20 km/h → nur 180 m AGL über Lehn, souverän gemeistert. **Entscheid: im neuen Gebiet bewusst
   konservativ, bei Talwind nicht mehr fliegen.**
+  Landeanalyse: Flug 1 Linksvolte, Endanflug 67° (Bergwind, 9 km/h auf Volten-Höhe) ab 99 m bei
+  289 m, 10 m zu kurz. Flug 2 fast windstill, Endanflug 99° mit S-Kurven ab 52 m, 10 m zu kurz (letzte
+  5 s nicht ganz gerade, 26°). Flug 3 Talwind, Endanflug 250° ab 50 m bei 118 m, GS nur 11 km/h
+  (Gegenwind ~15 km/h, aus Gegen-/End-Grundgeschwindigkeit), 14 m zu kurz.
+- **25.09.2026** (2 Flüge → Lehn): Flug 1 Bergwind 5 km/h, Endanflug 83° ab 54 m bei 260 m, 7 m zu kurz.
+  Flug 2 Talwind 4 km/h (W, INT zeigte gleichzeitig E 8 → INT nicht für Lehn), Endanflug 252° ab 32 m
+  bei 123 m, 6 m zu weit. Alle Prüfregeln erfüllt.
 - **30.10.2026** (Hochnebel; Bise im Mittelland, in Lehn Bergwind): Amisbühl ganztags 100 % rF, Harder bis 14 h in der Wolke, ab
   ~15 h knapp unter der Basis; Nebel **hob sich nur**, löste sich nicht auf. Lehn bis 9 h NE 10–14 km/h
   (Böen bis 26), danach E/SE 1–6, nie Talwind. Bise-Index nur +1.7–2.4 hPa; Genf hatte
@@ -134,7 +154,10 @@ Halbstundentakt ~85–90 min (24.09.: Starts 09:50 / 11:15 / 12:46).
     höchstens 200°, das wäre an der Prüfung ein Abzug. Flug 2 hat alle Regeln erfüllt.
   - Das Baro löst nur ~1 m auf: Der Fusskontakt lag 1–3 s nach «≤ 1 m AGL», also 5–10 m weiter.
     Darum zeigt `landeanalyse.py` ein Touchdown-Fenster.
-  - Gleitzahl über Grund im Endanflug 2.8–3.1, mit Bremse, Sinken 1.7–1.85 m/s.
+  - Gleitzahl über Grund im Endanflug 2.8–3.1, mit Bremse, Sinken 1.7–1.85 m/s (im September nur
+    1.24–1.48 m/s bei gleicher Fahrt ~25 km/h).
+- **Alle 7 Landungen (24.09.–31.10.):** 6 von 7 lagen 6–28 m zu kurz (Median 10 m). Der Landeplan
+  rechnet darum mit dem hohen Sinken (1.8 m/s) und lässt Überhöhe mit S-Kurven abbauen.
   - Archiv: `alleinflüge/archiv/2026-10-31_interlaken/`.
 
 ---
