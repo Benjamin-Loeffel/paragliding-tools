@@ -53,16 +53,18 @@ Die Regeln prüft `landeanalyse.py analyse`. Die Eckpunkt-Höhen je Wind liefert
 `landeanalyse.py plan`, als Volten auf der swisstopo-Karte `landeanalyse.py volten` (Talwind:
 `--kurs 250 --seite rechts`, Bergwind: `--kurs 75 --seite links`).
 
-**Höhenmesser (XC Tracer Maxx III, `landeanalyse.py hoehen`, 7 Flüge):** IGC-Baro = ISA-Druckhöhe
-(`HFALP:ISA`), GPS = Meereshöhe (`HFALG:GEO`).
-- **GPS** am Boden in Lehn +0.4…+5 m über swissALTI3D (Gerät ~1 m über Boden), am Start +1…+10 m.
-  Höhendifferenz Start → Landung auf ±5 m richtig.
-- **Baro mit QNH Interlaken** zeigt in Lehn immer **17–19 m zu wenig** (Sensor-Offset, alle 7 Flüge).
-- **Baro am Start richtig gestellt**: die Höhendifferenz bis Lehn stimmt nur auf −10…+17 m, weil die
-  Luft wärmer/kälter als ISA ist (September warm: Vario zeigt in Lehn 8–17 m zu viel; 31.10. kühl:
-  3–10 m zu wenig).
-- Für die Volte also: **Baro-Höhe in Lehn vor dem Hochfahren auf 565 m stellen** (danach nur noch
-  Druckänderung, ~0–1 hPa ≈ 0–8 m in 1–3 h) oder GPS-Höhe/AGL anzeigen.
+**Höhenmesser (XC Tracer Maxx III, `landeanalyse.py hoehen`, 7 Flüge):** Laut Handbuch (R06,
+18.10.2026, «Screen Options → Altitude») zeigt das Gerät die **GPS-Höhe (MSL)** und/oder die **Höhe über
+Grund (AGL)** aus dem vorinstallierten Geländemodell (Auflösung nicht angegeben). Eine QNH-/Baro-Höhe
+zum Einstellen gibt es nicht; der Drucksensor dient dem Vario. Im IGC: GPS = `HFALG:GEO` (Meereshöhe),
+Baro = ISA-Druckhöhe (`HFALP:ISA`).
+- **GPS am Boden in Lehn** +0.4…+5 m über swissALTI3D (Gerät ~1 m über Boden), am Start +1…+10 m.
+- **GPS in der Volte** (ab Gegenanflug) gegen Baro (am Boden genullt): Mittel −1…+3 m, an den
+  Eckpunkten meist ±1 m, höchstens +6 m. Die GPS-Anzeige taugt also für die Volten-Höhen.
+- **Lehn = 565 m:** Volten-Höhen + 565 m ablesen (Gegenanflug ~700–720 m, Queranflug ~655–660 m,
+  Endanflug 615 m). AGL-Anzeige vorher am Boden in Lehn prüfen (soll 0–1 m zeigen).
+- Nur fürs IGC: Baro mit QNH Interlaken liegt in Lehn immer 17–19 m zu tief (Sensor-Offset), die
+  Höhendifferenz Start → Lehn je nach Temperatur −10…+17 m daneben.
 
 ### Luftraum
 TMA HX Meiringen — Status per Tonband **0800 496 347** (Updates 07:30, 13:15, 17:05). Violette Zonen
