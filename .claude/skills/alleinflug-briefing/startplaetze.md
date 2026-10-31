@@ -35,6 +35,22 @@ Für alle Plätze gilt laut Tafel: **starke Talwinde bei labilen NW-Lagen ab Mit
   oder starkem Talwind; sofort räumen, kein Groundhandling.
 - C Flugplatz 575 m: **nur Notlandeplatz**, im Sperrgebiet des Heliports.
 
+### Praxisprüfung (SHV-Weisung Pilot GS, Juli 2025, Ziff. 5.7)
+Benjamins Prüfung: **6.11.2026 in Lehn**. Was für die Landeeinteilung zählt:
+- Der Landeanflug beginnt **luvseitig** des Landepunkts, im vorgegebenen Sektor und mit der
+  vorgegebenen Voltenrichtung. Danach folgen Gegenanflug, Kurve, Queranflug, Kurve und Endanflug.
+- Den Queranflug darf man bei mangelnder Höhe weglassen. Bei Überhöhe darf man ihn durch Kurven
+  von **höchstens 200°** wiederholen.
+- Im Endanflug sind S-Kurven bis **90° von der Achse** erlaubt. Die **letzten 5 s** müssen
+  geradeaus sein.
+- Landefläche: ein **Kreis von 34 m Ø**, ein Rechteck 20 × 45 m oder 15 × 60 m. Vorher den Boden
+  nicht berühren, nur mit den Füssen landen. Liegt die Landung mehr als 120 m vom Zentrum weg, ist
+  die Prüfung nicht bestanden.
+- Am Start wird der Schirm im **zugelassenen Gewichtsbereich** geprüft (Ziff. 5.2).
+
+Die Regeln prüft `landeanalyse.py analyse`. Die Eckpunkt-Höhen je Wind liefert
+`landeanalyse.py plan`.
+
 ### Luftraum
 TMA HX Meiringen — Status per Tonband **0800 496 347** (Updates 07:30, 13:15, 17:05). Violette Zonen
 (Heliports Interlaken/Gsteigwiler): Flugverbot; Abstand zu den markierten Heli-Routen.
@@ -112,6 +128,10 @@ Halbstundentakt ~85–90 min (24.09.: Starts 09:50 / 11:15 / 12:46).
     135 m vor dem Ziel. Im Queranflug zwei S-Kurven zum Höhenabbau.
   - *Flug 2:* Luegibrüggli 13:32, Landung 13:38, **Punktlandung** (Benjamin: ~1 m; IGC: nächster
     Punkt 2 m). Endanflug ab 49 m bei 153 m.
+  - *Wind auf Volten-Höhe* (aus den Kreisen im Positionsraum, `landeanalyse.py`): SW 213–221°,
+    9 km/h; am Mast Lehn 7–8 km/h aus WSW. Höhenwind ≈ Mast × 1.1–1.4.
+  - *Prüfregeln:* Flug 1 hatte im Queranflug eine Drehung von **219° am Stück**. Die Weisung erlaubt
+    höchstens 200°, das wäre an der Prüfung ein Abzug. Flug 2 hat alle Regeln erfüllt.
   - Das Baro löst nur ~1 m auf: Der Fusskontakt lag 1–3 s nach «≤ 1 m AGL», also 5–10 m weiter.
     Darum zeigt `landeanalyse.py` ein Touchdown-Fenster.
   - Gleitzahl über Grund im Endanflug 2.8–3.1, mit Bremse, Sinken 1.7–1.85 m/s.
