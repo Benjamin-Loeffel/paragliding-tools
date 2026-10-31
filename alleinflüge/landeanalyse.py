@@ -365,48 +365,62 @@ def _drucke(erg: dict) -> None:
               f"{s['luft']:6.1f}   {s['vorhalt']:+5.0f}°")
 
 
-def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel):
+def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel, rand: float = 150, sued: float = 250):
+    """Grundriss auf dem Luftbild (gross, mit `rand` m Umgebung, nach Süden `sued` m mehr) + Höhenprofil.
+
+    Höhen an den Eckpunkten als AGL (Baro, am Boden kalibriert) und als GPS-Höhe ü. M. (= Vario-Anzeige).
+    """
     from thermalmodel.plotstyle import use
     plt = use()
     a = ecke["Gegenanflug"] if ecke["Gegenanflug"] is not None else max(0, td - 180)
     a = max(0, a - VORLAUF)
     b = min(len(agl), td + 5)
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7.5), gridspec_kw={"width_ratios": [1.1, 1]})
+    gps0 = float(np.median(tr.gnss[-8:]))             # GPS am Boden (Ruhe nach der Landung)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(22, 11), gridspec_kw={"width_ratios": [2.3, 1]})
     TE, TN, _, R = ZIELE[ziel]
     ex, ny = tr.e - TE, tr.n - TN                     # Karte: Osten rechts, Norden oben
-    sc = ax1.scatter(ex[a:b], ny[a:b], c=agl[a:b], cmap="viridis", s=6)
-    ax1.plot(ex[a:b], ny[a:b], lw=0.5, color="0.6", zorder=0)
+    ax1.plot(ex[a:b], ny[a:b], lw=0.8, color="white", zorder=2, path_effects=_kontur("black", 2))
+    sc = ax1.scatter(ex[a:b], ny[a:b], c=agl[a:b], cmap="viridis", s=9, zorder=3)
     for name, i in ecke.items():
         if i is not None:
-            ax1.annotate(f"{name}\n{agl[i]:.0f} m", (ex[i], ny[i]), fontsize=7.5,
-                         xytext=(6, 6), textcoords="offset points", bbox=_KASTEN)
-            ax1.plot(ex[i], ny[i], "o", ms=5, mfc="none", mec="crimson")
-    ax1.add_patch(plt.Circle((0, 0), R, fill=False, ls="--", lw=1.0, color="red"))
-    ax1.plot(0, 0, "+", color="red", ms=10)
+            ax1.annotate(f"{name}\n{agl[i]:.0f} m AGL · {tr.gnss[i]:.0f} m GPS", (ex[i], ny[i]), fontsize=8,
+                         xytext=(8, 8), textcoords="offset points", bbox=_KASTEN, zorder=6)
+            ax1.plot(ex[i], ny[i], "o", ms=7, mfc="none", mec="red", mew=1.5, zorder=5)
+    ax1.add_patch(plt.Circle((0, 0), R, fill=False, lw=1.5, color="red", zorder=5))
+    ax1.add_patch(plt.Circle((0, 0), 17, fill=False, ls="--", lw=1.0, color="red", zorder=5))
     ax1.set_aspect("equal")
-    _karte(ax1, ziel, *_rand(ex[a:b], ny[a:b], 40))
+    x0, x1, y0, y1 = _rand(np.r_[ex[a:b], 0], np.r_[ny[a:b], 0], rand)
+    _karte(ax1, ziel, x0, x1, y0 - sued, y1)
     w = erg["wind"]
-    if w:                                             # Windpfeil: weht NACH (aus w[0])
+    if w:                                             # Windpfeil oben links, weht NACH (aus w[0])
         zu = math.radians(w[0] + 180)
-        x0, y0 = ax1.get_xlim()[0] + 40, ax1.get_ylim()[1] - 40
-        ax1.annotate("", (x0 + 60 * math.sin(zu), y0 + 60 * math.cos(zu)), (x0, y0),
-                     arrowprops=dict(arrowstyle="-|>", color="steelblue", lw=1.2))
-        ax1.text(x0, y0 + 12, f"Wind {w[1]:.0f}/{w[2]:.0f} km/h", color="steelblue", fontsize=7.5, bbox=_KASTEN)
+        ax1.annotate("", (0.06 + 0.05 * math.sin(zu), 0.90 + 0.05 * math.cos(zu)), (0.06, 0.90),
+                     xycoords="axes fraction", arrowprops=dict(arrowstyle="-|>", color="deepskyblue", lw=3,
+                                                               path_effects=_kontur("white", 5)))
+        ax1.text(0.06, 0.97, f"Wind Station aus {w[0]:.0f}° {w[1]:.0f}/{w[2]:.0f} km/h", transform=ax1.transAxes,
+                 fontsize=8, bbox=_KASTEN)
     ax1.set_xlabel("Osten [m] ab Zielpunkt")
     ax1.set_ylabel("Norden [m] ab Zielpunkt")
-    ax1.set_title(f"Grundriss (Norden oben), Zielkreis r = {R:.0f} m")
-    ax1.grid(lw=0.3)
-    fig.colorbar(sc, ax=ax1, label="Höhe AGL [m]", shrink=0.8)
-    dist = np.hypot(tr.e - ZIELE[ziel][0], tr.n - ZIELE[ziel][1])
-    ax2.plot(tr.t[a:b] - tr.t[td], agl[a:b], color="k")
+    ax1.set_title(f"Grundriss (Norden oben), Zielkreis r = {R:.0f} m, Prüfungskreis 34 m Ø gestrichelt")
+    ax1.grid(lw=0.3, alpha=0.5)
+    fig.colorbar(sc, ax=ax1, label="Höhe AGL [m]", shrink=0.7, pad=0.01)
+    dist = np.hypot(ex, ny)
+    t_ = tr.t[a:b] - tr.t[td]
+    ax2.plot(t_, agl[a:b], color="k", label="Baro AGL (am Boden kalibriert)")
+    ax2.plot(t_, tr.gnss[a:b] - gps0, color="tab:blue", lw=0.8, alpha=0.8, label="GPS (Vario-Anzeige)")
     for name, i in ecke.items():
         if i is not None:
             ax2.axvline(tr.t[i] - tr.t[td], color="crimson", lw=0.6, ls=":")
-            ax2.text(tr.t[i] - tr.t[td], agl[i] + 4, f"{name}\n{agl[i]:.0f} m / {dist[i]:.0f} m", fontsize=7.5)
+            ax2.text(tr.t[i] - tr.t[td], agl[i] + 6, f"{name}\n{agl[i]:.0f} m AGL\n{tr.gnss[i]:.0f} m GPS\n"
+                     f"{dist[i]:.0f} m vom Punkt", fontsize=7.5, bbox=_KASTEN)
     ax2.set_xlabel("Sekunden bis Touchdown")
-    ax2.set_ylabel("Höhe AGL [m] (Baro, am Boden kalibriert)")
-    w = erg["wind"]
-    ax2.set_title(f"Höhenprofil — Wind Station {f'aus {w[0]:.0f}° {w[1]:.0f}/{w[2]:.0f} km/h' if w else 'unbekannt'}")
+    ax2.set_ylabel("Höhe AGL [m]")
+    lo, hi = ax2.get_ylim()
+    ax3 = ax2.twinx()                                 # rechte Achse: GPS-Höhe ü. M. wie am Vario
+    ax3.set_ylim(lo + gps0, hi + gps0)
+    ax3.set_ylabel(f"GPS-Höhe m ü. M. (am Boden {gps0:.0f} m)")
+    ax2.set_title("Höhenprofil")
+    ax2.legend(loc="upper right", fontsize=8)
     ax2.grid(lw=0.3)
     fig.suptitle(f"{erg['datei']} — Touchdown {abs(erg['td_vor']):.0f} m "
                  f"{'zu kurz' if erg['td_vor'] > 0 else 'zu weit'}, {abs(erg['td_rechts']):.0f} m seitlich")

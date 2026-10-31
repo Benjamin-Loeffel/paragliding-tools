@@ -132,9 +132,13 @@ Halbstundentakt ~85–90 min (24.09.: Starts 09:50 / 11:15 / 12:46).
   289 m, 10 m zu kurz. Flug 2 fast windstill, Endanflug 99° mit S-Kurven ab 52 m, 10 m zu kurz (letzte
   5 s nicht ganz gerade, 26°). Flug 3 Talwind, Endanflug 250° ab 50 m bei 118 m, GS nur 11 km/h
   (Gegenwind ~15 km/h, aus Gegen-/End-Grundgeschwindigkeit), 14 m zu kurz.
+  Wind Lehn (Screenshot SHV-App, Station Lehn 566 m): bis ~10 h NE 6–10 (Böen 15), 10–11:30 Drehung über
+  E nach SE, 11:40 fast still, ab 12 h SW–W 8–14, Spitze 14–15 h (Böen 24), ab 16 h abflauend. Höhenwind
+  in der Volte ≈ Station × 1.2–1.35 (Flug 1: 9 zu 7, Flug 3: 15 zu 11).
 - **25.09.2026** (2 Flüge → Lehn): Flug 1 Bergwind 5 km/h, Endanflug 83° ab 54 m bei 260 m, 7 m zu kurz.
   Flug 2 Talwind 4 km/h (W, INT zeigte gleichzeitig E 8 → INT nicht für Lehn), Endanflug 252° ab 32 m
-  bei 123 m, 6 m zu weit. Alle Prüfregeln erfüllt.
+  bei 123 m, 6 m zu weit. Alle Prüfregeln erfüllt. Um 13:29 Lehn WSW 10/14 (Talwind voll), Amisbühl 3/8,
+  Hohwald 4/9.
 - **30.10.2026** (Hochnebel; Bise im Mittelland, in Lehn Bergwind): Amisbühl ganztags 100 % rF, Harder bis 14 h in der Wolke, ab
   ~15 h knapp unter der Basis; Nebel **hob sich nur**, löste sich nicht auf. Lehn bis 9 h NE 10–14 km/h
   (Böen bis 26), danach E/SE 1–6, nie Talwind. Bise-Index nur +1.7–2.4 hPa; Genf hatte
