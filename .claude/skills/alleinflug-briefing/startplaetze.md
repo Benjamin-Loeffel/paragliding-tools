@@ -255,12 +255,22 @@ Anreise und Aufstieg selbst planen. **offen:** Wie ging es am 30.10.?
   - *Simmental:* Boltigen 14–16 h NE 18–19 km/h, die Bise lief also eher das Simmental hinauf.
   - *Modell:* ICON-CH1 10 m am Pass mittags ENE 10–12 (Böen 24–31), also etwa **Faktor 2 zu hoch**.
     Den Index traf es (+1.5).
-- **31.10.2026** (Vergleich, ohne Flug): Index +3.0 hPa → Metschstand 09–10 h **NE 13–14 km/h**
-  (Böen 17–19), Lavey-Sattligrat NE 14, Albristhorn NE 16–21.
-- **Arbeitshypothese** (am Abend des 31.10. mit dem Nachmittag prüfen): Am Pass braucht es einen
-  Index von **≥ ~+3 hPa auch über Mittag**. Bei ~+1 hPa setzt sich über Mittag die lokale SW-Zirkulation
-  der Lenker Seite durch.
-
+- **31.10.2026** (Vergleich, ohne Flug). Archiv: `alleinflüge/archiv/2026-10-31_hahnenmoos/`.
+  - *Index:* morgens +2.7…+3.1 hPa, **13–16 h nur +1.0…+1.5**, ab 17 h wieder steigend (+2.0 um 18 h).
+  - *Metschstand:* trotzdem **den ganzen Tag NE**: 9–12 h 13–15 km/h, **13–17 h 12–16** (Böen 16–22),
+    18–19 h 21 km/h. Bantiger nachmittags ENE 22–26, abends 44/54.
+  - *Lokale SW-Zirkulation* gab es auch heute: Seewle 11–15 h SW/WSW 3–5, Albristhorn 12 h SW 8,
+    Lavey-Sattligrat 14–15 h schwach. Sie kam aber **nicht bis zum Metschstand**.
+  - *Modell:* ICON-CH1 10 m 13–17 km/h, also beim Mittelwind passend. Die Böen (33–40) waren
+    **doppelt zu hoch** (gemessen 16–22).
+- **Hypothese «≥ +3 hPa über Mittag nötig» ist widerlegt.** Am 31.10. reichte +1 hPa über Mittag
+  für NE 12–16 am Metschstand, am 30.10. gab +1.5 nur 3–7. Der Index allein erklärt den Unterschied
+  nicht (Bantiger und 700 hPa waren an beiden Tagen ähnlich). **offen:** Was am 30.10. anders war
+  (Sonne/Thermik auf der Lenker Seite? Bewölkung?). Bis dahin zählt der **Metschstand am Morgen**.
+- **Prognose 01.11.2026** (Stand 31.10. abends): Index **+3.3…+4.8 hPa den ganzen Tag**, ICON-CH1 und
+  CH2 einig, Maximum am Abend. Modell am Pass: 800 hPa NE 33–34 km/h, **700 hPa NE 60–68** km/h
+  (8–13 h), CH1 10 m ENE 21–28 (Böen 45–53). Metschstand um 18–19 h schon NE 21. Erwartung am Pass:
+  **Mittel ~20–28 km/h, Böen ~30–35**. Vorschlag: zu stark zum Spielen (Trimm 37 km/h).
 ---
 
 ## Weitere geflogene Startplätze — noch kein Briefing

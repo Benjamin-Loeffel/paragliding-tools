@@ -78,12 +78,13 @@ def holfuy(stationen: list[str], n: int) -> None:
             continue
         tab = {r[0]: r[1:] for r in rows[i:i + 7] if r}
         tk = next((k for k in tab if k.startswith("Temp")), None)
+        rf = tab.get("Humidity (%)")          # nicht jede Station misst rF (z. B. 484 Metschstand)
         zeiten = tab.get("Time", [])
         print(f"== Holfuy {sid}  {html.unescape(name.group(1)).replace('Holfuy: ', '').split(',')[0].strip() if name else ''}")
         print("   Zeit   Richtung   Mittel/Böe     rF      T")
         for k in range(max(0, len(zeiten) - n), len(zeiten)):
             print(f"  {zeiten[k]:>5}  {tab['Direction Deg.'][k]:>9}  {tab['Speed'][k]:>3}/{tab['Gust (km/h)'][k]:>3} km/h"
-                  f"  {tab['Humidity (%)'][k]:>5} %  {tab[tk][k] if tk else '-':>5} °C")
+                  f"  {rf[k] if rf else '-':>5} %  {tab[tk][k] if tk else '-':>5} °C")
 
 
 # ------------------------------------------------------------------ MeteoSchweiz SMN
