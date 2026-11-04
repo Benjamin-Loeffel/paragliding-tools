@@ -4,7 +4,14 @@ Rangfolge für den Entscheid: **Messung > Webcam > offizielle Textprognose > Mod
 Jede Angabe im Briefing mit Quelle und Uhrzeit.
 
 ## MeteoSchweiz-Textprognosen (Primärquelle Wetter)
-Kommen als **Screenshots aus der MeteoSchweiz-App** von Benjamin (kein stabiler öffentlicher Endpoint).
+**Selbst abrufen:** `lagecheck.py prognose [--plz 380000] [--datum JJJJ-MM-TT]` holt Allgemeine Lage,
+Wetterbericht Alpennordseite und die stündliche Ortsprognose (Wind/Böe als Median mit q10–q90, Richtung
+im 3-h-Raster, Sonne, Regen). Quellen wie die Website: `meteoschweiz.admin.ch/product/output/versions.json`
+→ `<produkt>/version__<v>/textproduct_de.xhtml` (`generalsituation/text/de`, `weather-report/de/north`);
+Ortsprognose `app-prod-ws.meteoswiss-app.ch/v1/plzDetail?plz=<PLZ sechsstellig>` (gefunden 04.11.2026).
+Die Ortsprognose Interlaken gilt für das Bödeli (INT), **nicht für Lehn**.
+**Gleitschirm- und Segelflugprognose** gibt es so nicht; die kommen weiter als **Screenshots aus der
+MeteoSchweiz-App** von Benjamin.
 - **Allgemeine Lage**, **Wetterbericht** (Abschnitte pro Tag; Wind «in den Bergen», Nullgrad).
 - **Gleitschirmprognose:** Abschnitt pro Tag mit eigener Ausgabezeit. Die für «morgen» kann zwei Tage
   alt sein (Ausgabe 00:47).

@@ -162,6 +162,16 @@ Halbstundentakt ~85–90 min (24.09.: Starts 09:50 / 11:15 / 12:46).
     Darum zeigt `landeanalyse.py` ein Touchdown-Fenster.
   - Gleitzahl über Grund im Endanflug 2.8–3.1, mit Bremse, Sinken 1.7–1.85 m/s (im September nur
     1.24–1.48 m/s bei gleicher Fahrt ~25 km/h).
+- **Woche 30.10.–04.11.2026** (Holfuy Lehn/Amisbühl/Hohwald 15 min, Archiv
+  `alleinflüge/archiv/2026-11-04_lehn-woche/`; Abschnitt «Freitag 6.11.» im Lehn-Artefakt):
+  - **Talwind nur an Tagen mit Sonne im Bödeli** (31.10., 04.11.), dann jedes Mal **um 11:30**, nach
+    45–60 min drehendem, schwachem Wind (letzter Bergwind 10:30–10:45).
+  - Bei Hochnebel oder Bise (30.10., 01.–03.11.) blieb Lehn den ganzen Tag bei NE/E 5–15 km/h (bei Bise
+    Böen bis 29); am 02.11. kam WSW erst um 15:30.
+  - Jeden Morgen um 7–8 h Bergwind NE–E 4–14 km/h.
+  - Amisbühl an 4 von 6 Tagen ganz oder zeitweise in der Wolke (rF ≥ 97 %), Hohwald nur am 02./03.11.
+  - **ICON-CH1 kennt den Lehn-Bergwind nicht:** zeigt fast immer WSW; um 8 h 5 von 6 Mal falsche
+    Richtung, mittags nur an den Sonnentagen richtig.
 - **Alle 7 Landungen (24.09.–31.10.):** 6 von 7 lagen 6–28 m zu kurz (Median 10 m). Der Landeplan
   rechnet darum mit dem hohen Sinken (1.8 m/s) und lässt Überhöhe mit S-Kurven abbauen.
   - Archiv: `alleinflüge/archiv/2026-10-31_interlaken/`.

@@ -433,6 +433,49 @@ def archiv(datum: dt.date, name: str, ids: list[str], punkt: str | None, stunden
     print(f"\n-> {ziel}")
 
 
+# ------------------------------------------------------------------ MeteoSchweiz-Prognose (Web-App)
+
+MCH = "https://www.meteoschweiz.admin.ch/product/output"
+
+
+def prognose(plz: str, datum: dt.date, stunden: list[int], region: str) -> None:
+    """Textprognosen (Allgemeine Lage, Wetterbericht) und stündliche Ortsprognose der MeteoSchweiz.
+
+    Quellen wie die Website: `versions.json` → `<produkt>/version__<v>/textproduct_de.xhtml`;
+    Ortsprognose über den App-Endpoint `plzDetail` (PLZ sechsstellig, Interlaken = 380000) mit
+    Wind/Böe als Median und q10–q90 sowie Richtung im 3-h-Raster.
+    """
+    ver = requests.get(f"{MCH}/versions.json", timeout=30).json()
+    for k in ("generalsituation/text/de", f"weather-report/de/{region}"):
+        t = requests.get(f"{MCH}/{k}/version__{ver[k]}/textproduct_de.xhtml", timeout=30).content.decode("utf-8")
+        t = html.unescape(re.sub(r"<[^>]+>", "", re.sub(r"<(br|/p|/h\d|/li)[^>]*>", "\n", t)))
+        print(f"== {k} (Version {ver[k]})")
+        zeilen = [z for z in re.sub(r"\n\s*\n+", "\n", t).strip().splitlines()]
+        print("\n".join(dict.fromkeys(zeilen)), "\n")          # Allgemeine Lage steht im XHTML doppelt
+    g = requests.get("https://app-prod-ws.meteoswiss-app.ch/v1/plzDetail", params={"plz": plz},
+                     headers={"User-Agent": "MeteoSwissApp-2.16-Android"}, timeout=30).json()["graph"]
+    tz, s1, s3 = _tz(), g["start"], g["startLowResolution"]
+    H = 3_600_000
+
+    def at(arr, t0, step, t):
+        i = (t - t0) // step
+        return arr[i] if 0 <= i < len(arr) else None
+
+    print(f"== Ortsprognose PLZ {plz}, {datum}  (Median, q10–q90; Richtung 3-h-Raster)")
+    print("  Zeit  Richtung  Wind km/h       Böe km/h        Sonne min  Regen mm")
+    for h in stunden:
+        t = int(dt.datetime.combine(datum, dt.time(h), tz).timestamp() * 1000)
+        t3 = t - ((t - s3) % (3 * H))
+        r = at(g["windDirection3h"], s3, 3 * H, t3)
+        w = [at(g[k], s1, H, t) for k in ("windSpeed1h", "windSpeed1hq10", "windSpeed1hq90")]
+        b = [at(g[k], s1, H, t) for k in ("gustSpeed1h", "gustSpeed1hq10", "gustSpeed1hq90")]
+        if w[0] is None:
+            continue
+        print(f"  {h:02d} h  {_richtung(r) if r is not None else '-':>6}  {w[0]:4.1f} ({w[1]:.0f}–{w[2]:.0f})"
+              f"   {b[0]:4.1f} ({b[1]:.0f}–{b[2]:.0f})   {at(g['sunshine1h'], s1, H, t) or 0:5.0f}"
+              f"   {at(g['precipitation1h'], s1, H, t) or 0:6.1f}")
+
+
 # ------------------------------------------------------------------ Fahrplan
 
 def fahrplan(von: str, nach: str, datum: str, zeit: str, n: int) -> None:
@@ -475,6 +518,10 @@ def main(argv: list[str] | None = None) -> int:
     m = sub.add_parser("modell"); m.add_argument("lat", type=float); m.add_argument("lon", type=float)
     m.add_argument("--tage", type=int, default=2); m.add_argument("--vortage", type=int, default=1)
     m.add_argument("--stunden", default="8-18")
+    pg = sub.add_parser("prognose", help="MeteoSchweiz: Textprognose + Ortsprognose")
+    pg.add_argument("--plz", default="380000", help="sechsstellig, z. B. 380000 Interlaken")
+    pg.add_argument("--datum", default=(dt.date.today() + dt.timedelta(days=1)).isoformat())
+    pg.add_argument("--stunden", default="7-17"); pg.add_argument("--region", default="north")
     r = sub.add_parser("archiv"); r.add_argument("datum"); r.add_argument("name")
     r.add_argument("ids", nargs="+", help="winds.mobi-IDs")
     r.add_argument("--punkt", metavar="LAT,LON", help="zusätzlich Modell an diesem Punkt")
@@ -503,6 +550,8 @@ def main(argv: list[str] | None = None) -> int:
         print(verlauf(a.ids, dt.date.fromisoformat(a.datum), _std(a.stunden)))
     elif a.cmd == "modell":
         print(modell(a.lat, a.lon, a.tage, a.vortage, _std(a.stunden)))
+    elif a.cmd == "prognose":
+        prognose(a.plz, dt.date.fromisoformat(a.datum), _std(a.stunden), a.region)
     elif a.cmd == "archiv":
         archiv(dt.date.fromisoformat(a.datum), a.name, a.ids, a.punkt, _std(a.stunden))
     return 0
