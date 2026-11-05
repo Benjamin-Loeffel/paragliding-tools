@@ -59,8 +59,14 @@ Grund (AGL)** aus dem vorinstallierten Geländemodell (Auflösung nicht angegebe
 zum Einstellen gibt es nicht; der Drucksensor dient dem Vario. Im IGC: GPS = `HFALG:GEO` (Meereshöhe),
 Baro = ISA-Druckhöhe (`HFALP:ISA`).
 - **GPS am Boden in Lehn** +0.4…+5 m über swissALTI3D (Gerät ~1 m über Boden), am Start +1…+10 m.
-- **GPS in der Volte** (ab Gegenanflug) gegen Baro (am Boden genullt): Mittel −1…+3 m, an den
-  Eckpunkten meist ±1 m, höchstens +6 m. Die GPS-Anzeige taugt also für die Volten-Höhen.
+- **GPS in der Volte** (ab Gegenanflug) gegen Baro (am Boden genullt, + 565.1): im Mittel **+3 m zu viel**
+  (je Flug −1…+6 m), innerhalb eines Tages fast fest und ≈ GPS am Boden in Lehn − 565. 615 am Vario ≈ 47 m
+  über Grund. Korrektur: am Briefing in Lehn Bodenwert ablesen, «Wert − 565» zu allen Plan-Höhen addieren
+  (Validierung 05.11.2026, eigene + unabhängige Zweitprüfung).
+- **Plan vs. Flüge (05.11.2026):** Gleitweg ab Endanflug-Beginn in 6 von 7 Flügen ≥ Plan mit 1.8 m/s
+  (31.10. #1 −3 m) → Plan vorsichtig. «Bei Windstille näher eindrehen» war falsch (24.09. #2 hatte S-Kurven,
+  273 m Weg auf 178 m Strecke). Höhenwind/Holfuy am 31.10. 0.8–1.0 → Faktor jetzt 1.0. Queranflug mit 10 m
+  Reserve (Kurve in den Endanflug kostet bei ~200 m Queranflug 47–77 m statt 40 m).
 - **Lehn = 565 m:** Volten-Höhen + 565 m ablesen (Gegenanflug ~700–720 m, Queranflug ~655–660 m,
   Endanflug 615 m). AGL-Anzeige vorher am Boden in Lehn prüfen (soll 0–1 m zeigen).
 - Nur fürs IGC: Baro mit QNH Interlaken liegt in Lehn immer 17–19 m zu tief (Sensor-Offset), die

@@ -514,7 +514,8 @@ def volten(winde: list[float], kurs: float, seite: str, faktor: float, igcs: lis
 
     Geometrie wie geflogen: Gegenanflug 210 m neben der Achse ab 200 m hinter dem Punkt (Positionsraum
     luvseitig), Queranflug quer zur Achse, Endanflug-Länge je Wind = Gleitweg ab 50 m (KALIB End).
-    Zahlen = GPS-Höhe m ü. M. wie am Vario (Zielhöhe + AGL). `spicker`: kleines Bild mit grosser Schrift
+    Plan-Zahlen = Zielhöhe + Höhe über Grund (Vario-GPS zeigt typisch 0–6 m mehr, siehe KALIB), geflogene
+    Eckpunkte = GPS-Höhe aus dem IGC. Queranflug mit QUER_RESERVE. `spicker`: kleines Bild mit grosser Schrift
     für den A4-Spicker (ohne geflogene Tracks).
     """
     from thermalmodel.plotstyle import use
@@ -533,7 +534,7 @@ def volten(winde: list[float], kurs: float, seite: str, faktor: float, igcs: lis
         if not r["ok"]:
             continue
         le = r["l_e50"]
-        h_q = 50 + Q * KALIB["Quer"][1] / (math.sqrt(max(0.01, KALIB["Quer"][0] ** 2 - u ** 2)) / 3.6)
+        h_q = 50 + Q * KALIB["Quer"][1] / (math.sqrt(max(0.01, KALIB["Quer"][0] ** 2 - u ** 2)) / 3.6)             + QUER_RESERVE
         h_g = h_q + (P + le) * KALIB["Gegen"][1] / ((KALIB["Gegen"][0] + u) / 3.6)
         x, y = _aus_achse([-P, le, le, 0], [sg * Q, sg * Q, 0, 0], kurs)
         pkt += list(zip(x, y))
@@ -561,12 +562,12 @@ def volten(winde: list[float], kurs: float, seite: str, faktor: float, igcs: lis
             i = ecke[k]
             if i is not None:
                 ax.plot(tr.e[i] - TE, tr.n[i] - TN, "s", ms=5, color="white", mec="k", zorder=4)
-                ax.annotate(f"{TH + agl[i]:.0f}", (tr.e[i] - TE, tr.n[i] - TN), xytext=(-18, 4),
+                ax.annotate(f"{tr.gnss[i]:.0f}", (tr.e[i] - TE, tr.n[i] - TN), xytext=(-18, 4),
                             textcoords="offset points", fontsize=7.5, bbox=_KASTEN)
     if igcs:
         ax.plot([], [], "-s", color="white", mec="k", lw=1.0, ms=5, path_effects=_kontur("black", 2.2),
                 label="geflogen: " + ", ".join(f"{Path(i).stem[:10]} #{Path(i).stem[-1]}" for i in igcs)
-                      + " (Eckpunkte m ü. M.)")
+                      + " (Eckpunkte GPS m ü. M. wie am Vario)")
     R = ZIELE[ziel][3]
     ax.add_patch(plt.Circle((0, 0), R, fill=False, lw=1.5, color="red", zorder=5))
     ax.add_patch(plt.Circle((0, 0), 17, fill=False, lw=1.0, ls="--", color="red", zorder=5))
@@ -590,7 +591,7 @@ def volten(winde: list[float], kurs: float, seite: str, faktor: float, igcs: lis
         ax.set_xlabel("Osten [m] ab Zielpunkt")
         ax.set_ylabel("Norden [m] ab Zielpunkt")
         ax.set_title(f"Landevolten Lehn — {'Rechts' if sg > 0 else 'Links'}volte, Endanflug {kurs:.0f}°, "
-                     f"Endanflug ab {TH + 50:.0f} m; Zahlen = GPS-Höhe m ü. M. am Eckpunkt (Planmodell, 7 Flüge); "
+                     f"Endanflug ab {TH + 50:.0f} m; Zahlen = m ü. M. am Eckpunkt (Plan: Lehn + über Grund, geflogen: GPS); "
                      f"geflogen ab {VORLAUF // 60} min vor dem Gegenanflug", fontsize=10)
         ax.legend(loc="lower left", fontsize=7.5, framealpha=0.9)
     OUT.mkdir(exist_ok=True)
@@ -735,11 +736,18 @@ def hoehen(igcs: list[str], ziel: str) -> None:
 #   Endanflug   Luft 23–29 km/h (Mittel 25.7), Sinken 1.24–1.85 m/s (Median 1.36; 31.10.: 1.70/1.85)
 #   Queranflug  Sinken 1.0–1.8 m/s (Median 1.6);  Gegenanflug Luft 29–35 km/h, Sinken 1.0–2.3 (Median 1.4)
 #   Geometrie: Endanflug 118–289 m (Median 153), Queranflug 200–230 m, Gegenanflug 270–370 m.
-#   6 von 7 Landungen lagen 6–28 m zu kurz (Median 9.5 m) -> Plan rechnet mit dem hohen Sinken (1.8),
-#   überschüssige Höhe wird mit S-Kurven abgebaut; das Sinken in ruhiger Luft (1.35) zeigt die Spanne.
+#   Validierung 05.11.2026 (eigene + unabhängige Zweitprüfung): Gleitweg ab Endanflug-Beginn in 6 von 7
+#   Flügen >= Plan mit 1.8 m/s (31.10. #1: −3 m) -> Plan vorsichtig, in ruhiger Luft kommt man hoch an,
+#   Rest mit S-Kurven. Bodennähe (<= 1 m) 6–28 m vor dem Punkt, 2 s später im Median nur ~5 m.
+#   Gegen-/Queranflug-Sinken im Mittel getroffen (±15–20 m Streuung); Queranflug inkl. Kurve bei ~200 m
+#   Länge 47–77 m statt 40 m -> QUER_RESERVE. Höhenwind / Holfuy längs Achse am 31.10.: 0.8–1.0.
+#   Höhen hier = wahre Höhe (Baro, am Boden genullt) + Zielhöhe. Vario-GPS zeigte in der Volte im Mittel
+#   +3 m mehr (−1…+6, je Tag fest ≈ GPS am Boden in Lehn − 565).
 KALIB = {"End": (25.5, 1.80), "Quer": (30.0, 1.60), "Gegen": (30.0, 1.40)}
 END_RUHIG = (25.5, 1.35)
 GEOM = {"End": 145.0, "Quer": 210.0, "Gegen": 350.0}
+QUER_RESERVE = 10.0    # m Reserve am Beginn des Queranflugs (zu tief -> früher eindrehen, zu hoch -> verlängern)
+FAKTOR = 1.0           # Höhenwind / Holfuy Lehn (31.10.: 0.8–1.0 längs Achse; früher 1.3, nicht belegt)
 # Geflogen (Gegenwind Volten-Höhe km/h, Endanflug ab m AGL, Distanz zum Punkt m, Touchdown zu kurz m)
 FLUEGE = [(9.0, 99, 289, 9.5), (0.4, 52, 186, 10.1), (14.6, 50, 118, 14.3), (4.9, 54, 260, 7.4),
           (3.7, 32, 123, -5.6), (7.1, 40, 135, 27.7), (7.9, 49, 153, 5.9)]
@@ -757,7 +765,7 @@ def plan_rechnen(u: float, kal: dict = KALIB, geom: dict = GEOM, end=None) -> di
         return {"u": u, "ok": False}
     h_e = geom["End"] * w_e / gs_e
     gs_q = math.sqrt(max(0.01, v_q ** 2 - u ** 2)) / 3.6
-    h_q = h_e + geom["Quer"] * w_q / gs_q
+    h_q = h_e + geom["Quer"] * w_q / gs_q + QUER_RESERVE
     h_g = h_q + geom["Gegen"] * w_g / ((v_g + u) / 3.6)
     return {"u": u, "ok": True, "gs_e": gs_e * 3.6, "gz_e": gs_e / w_e, "h_e": h_e,
             "vorhalt": math.degrees(math.asin(min(1.0, u / v_q))), "h_q": h_q, "h_g": h_g,
@@ -769,7 +777,8 @@ def plan(winde: list[float], faktor: float, png: bool) -> None:
     print("Kalibrierung Lehn, 7 Flüge 24.09.–31.10.2026 (Alpha 6 24): " + ", ".join(
         f"{k} {v:.0f} km/h / {w:.2f} m/s" for k, (v, w) in KALIB.items()))
     print(f"Geometrie: Endanflug {GEOM['End']:.0f} m, Queranflug {GEOM['Quer']:.0f} m, "
-          f"Gegenanflug {GEOM['Gegen']:.0f} m. Höhenwind ≈ Mast Lehn × {faktor:.1f} (31.10.: 1.1–1.4).")
+          f"Gegenanflug {GEOM['Gegen']:.0f} m. Höhenwind ≈ Mast Lehn × {faktor:.1f} (31.10.: 0.8–1.0 längs Achse). "
+          f"Queranflug mit {QUER_RESERVE:.0f} m Reserve.")
     print("Gegenwind  Mast≈  | Beginn Gegen  Beginn Quer  Beginn End | GS End  GZ Grund | Endanflug-Länge "
           "ab 50 m | Vorhalt Quer | End ruhige Luft | End im Trimm*")
     rows = []
@@ -836,13 +845,13 @@ def main(argv=None) -> int:
     p = sub.add_parser("plan")
     p.add_argument("--gegenwind", default="0,2,4,6,8,10,12,14,16,18,20",
                    help="Gegenwind im Endanflug auf Volten-Höhe, km/h (Liste)")
-    p.add_argument("--faktor", type=float, default=1.3, help="Höhenwind / Mastwind")
+    p.add_argument("--faktor", type=float, default=FAKTOR, help="Höhenwind / Mastwind")
     p.add_argument("--kein-plot", action="store_true")
     v = sub.add_parser("volten", help="Landevolten je Gegenwind auf der swisstopo-Karte")
     v.add_argument("--gegenwind", default="0,5,10,15", help="Gegenwind auf Volten-Höhe, km/h (Liste)")
     v.add_argument("--kurs", type=float, default=250, help="Endanflug-Kurs ° (31.10.: 250 = gegen WSW-Wind)")
     v.add_argument("--seite", choices=("rechts", "links"), default="rechts", help="Rechts-/Linksvolte")
-    v.add_argument("--faktor", type=float, default=1.3, help="Höhenwind / Mastwind")
+    v.add_argument("--faktor", type=float, default=FAKTOR, help="Höhenwind / Mastwind")
     v.add_argument("--flug", nargs="*", default=[], help="geflogene IGC zum Vergleich darüberlegen")
     v.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
     v.add_argument("--ebene", default=KARTE, help="WMS-Ebene (Landeskarte: ch.swisstopo.pixelkarte-farbe)")
