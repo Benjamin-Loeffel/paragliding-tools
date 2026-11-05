@@ -456,7 +456,57 @@ def _modell_lehn(stunden_zurueck: int = 7, stunden_vor: int = 7) -> dict[str, di
     return out
 
 
-def _grafik_lehn(lehn: list[dict], titel: str, jetzt_t: dt.datetime, stunden: int = 6) -> Path:
+def _ortsprognose_reihe(plz: str = "380000") -> list[dict]:
+    """MeteoSchweiz-Ortsprognose (App, wie plzDetail in `prognose`): stündlich Median/q10/q90 Wind und Böe,
+    Richtung im 3-h-Raster; ab Tagesbeginn (also auch rückblickend). Zeiten lokal, ohne Zeitzone."""
+    try:
+        g = requests.get("https://app-prod-ws.meteoswiss-app.ch/v1/plzDetail", params={"plz": plz},
+                         headers={"User-Agent": "MeteoSwissApp-2.16-Android"}, timeout=30).json()["graph"]
+    except Exception as e:
+        print(f"  (Ortsprognose nicht geladen: {e})")
+        return []
+    tz, H = _tz(), 3_600_000
+    out = []
+    for i, v in enumerate(g.get("windSpeed1h", [])):
+        ms = g["start"] + i * H
+        j = (ms - g["start"]) // (3 * H)          # 3-h-Felder beginnen bei `start` (48 × 3 h = 144 h)
+        d = g["windDirection3h"][j] if 0 <= j < len(g["windDirection3h"]) else None
+        if v is None or d is None:
+            continue
+        out.append({"t": dt.datetime.fromtimestamp(ms / 1000, tz).replace(tzinfo=None), "dir": d, "mittel": v,
+                    "q10": g["windSpeed1hq10"][i], "q90": g["windSpeed1hq90"][i], "boee": g["gustSpeed1h"][i]})
+    return out
+
+
+def _modell_check(lehn: list[dict], reihen: dict[str, list[dict]], t_end: dt.datetime, stunden: int = 3) -> list[str]:
+    """Welche Prognose passt zur Messung? Für die letzten `stunden` vollen Stunden: Holfuy-Stundenmittel
+    (±30 min, vektoriell) gegen den Prognosewert: Vektorfehler km/h und Berg/Tal/still getroffen."""
+    import math
+    zeilen = []
+    for name, r in reihen.items():
+        fehler, treffer, n = [], 0, 0
+        for x in r:
+            if not (t_end - dt.timedelta(hours=stunden, minutes=30) <= x["t"] <= t_end - dt.timedelta(minutes=30)):
+                continue
+            f = _fenster(lehn, x["t"] + dt.timedelta(minutes=30), 60)
+            if not f:
+                continue
+            vek = lambda d, v: (v * math.sin(math.radians(d)), v * math.cos(math.radians(d)))
+            a, b = vek(f["dir"], f["mittel"]), vek(x["dir"], x["mittel"])
+            fehler.append(math.hypot(a[0] - b[0], a[1] - b[1]))
+            treffer += _lehn_klasse(f["dir"], f["mittel"]) == _lehn_klasse(x["dir"], x["mittel"])
+            if name == "Ortsprognose":               # Interlaken: Richtung nicht Lehn -> nur Stärke vergleichen
+                fehler[-1] = abs(f["mittel"] - x["mittel"])
+            n += 1
+        if n:
+            zeilen.append((sum(fehler) / n, f"{name} {sum(fehler) / n:.0f} km/h daneben"
+                           + ("" if name == "Ortsprognose" else f", Phase {treffer}/{n}")))
+    zeilen.sort()
+    return [z for _, z in zeilen]
+
+
+def _grafik_lehn(lehn: list[dict], titel: str, jetzt_t: dt.datetime, stunden: int = 6,
+                 mod: dict | None = None, ort: list[dict] | None = None) -> Path:
     """Grafik für unterwegs: oben Pfeile (wohin der Wind weht), Mitte Mittel/Böe Holfuy Lehn (2 min) der letzten
     `stunden` h und ICON-CH1/CH2 (Kontrolllauf + 10–90-%-Band der Ensembles, vorher zum Prüfen, danach Prognose),
     unten links Radar (Richtung/Stärke: Holfuy letzte Stunde, Modelle −1…+3 h), unten rechts Anteil der Member
@@ -467,10 +517,11 @@ def _grafik_lehn(lehn: list[dict], titel: str, jetzt_t: dt.datetime, stunden: in
     import matplotlib.dates as mdates
     import matplotlib.pyplot as plt
     farbe = {"Berg": "#2b6cb0", "Tal": "#dd6b20", "still": "#a0aec0", "anders": "#805ad5", "?": "#a0aec0"}
-    mfarbe = {"Holfuy": "#2f855a", "ICON-CH1": "#c53030", "ICON-CH2": "#6b46c1"}
+    mfarbe = {"Holfuy": "#2f855a", "ICON-CH1": "#c53030", "ICON-CH2": "#6b46c1", "Ortsprognose": "#1a202c"}
     t0, t1 = jetzt_t - dt.timedelta(hours=stunden), jetzt_t + dt.timedelta(hours=stunden)
     w = [x for x in lehn if x["t"] >= t0 and x["mittel"] is not None]
-    mod = _modell_lehn(stunden + 1, stunden + 1)
+    mod = mod if mod is not None else _modell_lehn(stunden + 1, stunden + 1)
+    ort = ort or []
     plt.rcParams.update({"font.size": 7})
     fig = plt.figure(figsize=(6.2, 8.8), dpi=250)
     go = fig.add_gridspec(2, 1, height_ratios=[0.8, 3.0], hspace=0.04, top=0.97, bottom=0.47)
@@ -493,6 +544,12 @@ def _grafik_lehn(lehn: list[dict], titel: str, jetzt_t: dt.datetime, stunden: in
         ax.plot([x["t"] for x in r], [x["mittel"] for x in r], color=c, lw=1.1, marker="o", ms=2,
                 label=f"{name} Mittel (Band 10–90 %, {r[0]['n'] if r else 0} Member)")
         ax.plot([x["t"] for x in r], [x["boee"] for x in r], color=c, lw=0.6, ls=":", label=f"{name} Böe")
+    r = [x for x in ort if t0 - dt.timedelta(hours=1) <= x["t"] <= t1]
+    if r:
+        ax.fill_between([x["t"] for x in r], [x["q10"] for x in r], [x["q90"] for x in r], facecolor="none",
+                        edgecolor=mfarbe["Ortsprognose"], hatch="////", lw=0, alpha=0.25)
+        ax.plot([x["t"] for x in r], [x["mittel"] for x in r], color=mfarbe["Ortsprognose"], lw=1.0, ls="-.",
+                marker="s", ms=1.8, label="Ortsprognose Interlaken (schraffiert 10–90 %)")
     for a_ in (ax, ap):
         a_.axvline(jetzt_t, color="k", lw=0.8)
     ap.text(jetzt_t, 2.0, "  jetzt → Prognose", va="center", fontsize=6.5, fontweight="bold")
@@ -506,7 +563,8 @@ def _grafik_lehn(lehn: list[dict], titel: str, jetzt_t: dt.datetime, stunden: in
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%H"))
     ax.xaxis.set_major_locator(mdates.HourLocator())
     # --- Pfeilzeilen (wohin der Wind weht)
-    zeilen = [("Holfuy", 2.0)] + [(n, 1.0 - 0.9 * k) for k, n in enumerate(mod)]
+    zeilen = [("Holfuy", 2.0)] + [(n, 1.1 - 0.75 * k) for k, n in enumerate(mod)] + \
+        ([("Ortsprognose", 1.1 - 0.75 * len(mod))] if ort else [])
     for name, y in zeilen:
         if name == "Holfuy":
             pfeile, t = [], t0
@@ -515,17 +573,21 @@ def _grafik_lehn(lehn: list[dict], titel: str, jetzt_t: dt.datetime, stunden: in
                 if f:
                     pfeile.append((t + dt.timedelta(minutes=7.5), f["dir"], f["mittel"]))
                 t += dt.timedelta(minutes=15)
+        elif name == "Ortsprognose":
+            pfeile = [(x["t"], x["dir"], x["mittel"]) for x in ort if t0 <= x["t"] <= t1 and x["t"].hour % 3 == 1]
         else:
             pfeile = [(x["t"], x["dir"], x["mittel"]) for x in mod[name] if t0 <= x["t"] <= t1]
         if pfeile:
             zu = [math.radians(d + 180) for _, d, _ in pfeile]
             ap.quiver([mdates.date2num(t) for t, *_ in pfeile], [y] * len(pfeile),
                       [math.sin(z) for z in zu], [math.cos(z) for z in zu],
-                      color=[farbe[_lehn_klasse(d, v)] for _, d, v in pfeile], angles="uv", pivot="middle",
+                      color=[mfarbe["Ortsprognose"] if name == "Ortsprognose" else farbe[_lehn_klasse(d, v)]
+                             for _, d, v in pfeile], angles="uv", pivot="middle",
                       scale=50 if name == "Holfuy" else 38, width=0.0030 if name == "Holfuy" else 0.0042,
                       headwidth=3.5, headlength=4, headaxislength=3.5)
-        ap.text(-0.01, y, name, transform=ap.get_yaxis_transform(), ha="right", va="center", fontsize=6)
-    ap.set_ylim(-0.5, 2.5)
+        ap.text(-0.01, y, "Ortsprognose\nInterlaken" if name == "Ortsprognose" else name,
+                transform=ap.get_yaxis_transform(), ha="right", va="center", fontsize=6)
+    ap.set_ylim(-0.75, 2.5)
     ap.set_yticks([])
     plt.setp(ap.get_xticklabels(), visible=False)
     for sp in ("top", "right", "left"):
@@ -657,11 +719,28 @@ def jetzt(stationen: list[str], bis: str | None = None, grafik: bool = True) -> 
         frisch = seit is not None and (t_end - seit).total_seconds() < 20 * 60
         stufe = "NAH" if (wechsel or frisch or (f10["mittel"] < 3 and len(gruende) >= 2)) else             ("MÖGLICH" if gruende else "nicht in Sicht")
         print(f"  Kipppunkt: {stufe}" + (f" — {'; '.join(gruende)}" if gruende else ""))
+        mod, ort = _modell_lehn(7, 7), _ortsprognose_reihe()
+        reihen = {**mod, **({"Ortsprognose": ort} if ort else {})}
+        check = _modell_check(lehn, reihen, t_end)
+        if check:
+            print("  Prognose-Check letzte 3 h (beste zuerst): " + " · ".join(check))
+        nxt = [t_end.replace(minute=0, second=0) + dt.timedelta(hours=k) for k in (1, 2, 3)]
+        teile = []
+        for name, r in mod.items():
+            werte = [next((x for x in r if x["t"] == t), None) for t in nxt]
+            if all(werte):
+                teile.append(f"{name} " + "/".join(f"{x['Tal'] * 100:.0f}" for x in werte) + " %")
+        if teile:
+            print(f"  Talwind-Anteil der Member {'/'.join(f'{t:%H}' for t in nxt)} h: " + ", ".join(teile))
+        ow = [next((x for x in ort if x["t"] == t), None) for t in nxt]
+        if all(ow):
+            print("  Ortsprognose Interlaken " + ", ".join(f"{x['t']:%H} h {_richtung(x['dir'])} {x['mittel']:.0f}"
+                                                       for x in ow) + " km/h")
         if grafik:
             titel = (f"Lehn {t_end:%d.%m. %H:%M}: {_richtung(f10['dir'])} {f10['mittel']:.0f} km/h, Böe {f10['boee']:.0f}"
                      f" (10 min) · {kl + 'wind' if kl in ('Berg', 'Tal') else kl}"
                      + (f" seit {seit:%H:%M}" if seit else "") + f" · Kipppunkt {stufe.lower()}")
-            print(f"  Grafik: {_grafik_lehn(lehn, titel, t_end)}")
+            print(f"  Grafik: {_grafik_lehn(lehn, titel, t_end, mod=mod, ort=ort)}")
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from landeanalyse import KALIB, QUER_RESERVE, ZIELE
         TH = ZIELE["lehn"][2]
@@ -769,7 +848,8 @@ def prognose(plz: str, datum: dt.date, stunden: list[int], region: str) -> None:
         print("\n".join(dict.fromkeys(zeilen)), "\n")          # Allgemeine Lage steht im XHTML doppelt
     g = requests.get("https://app-prod-ws.meteoswiss-app.ch/v1/plzDetail", params={"plz": plz},
                      headers={"User-Agent": "MeteoSwissApp-2.16-Android"}, timeout=30).json()["graph"]
-    tz, s1, s3 = _tz(), g["start"], g["startLowResolution"]
+    tz, s1 = _tz(), g["start"]
+    s3 = s1          # 3-h-Felder ab `start` (bis 05.11.2026 fälschlich ab startLowResolution = +25 h verschoben)
     H = 3_600_000
 
     def at(arr, t0, step, t):
