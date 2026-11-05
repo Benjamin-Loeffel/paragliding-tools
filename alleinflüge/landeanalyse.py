@@ -641,6 +641,95 @@ def karte_alle(igcs: list[str], ziel: str, ebene: str) -> None:
     print(f"Plot: {f}")
 
 
+def blatt(igcs: list[str], ziel: str, ebene: str, vorlauf: float = 45) -> None:
+    """Kartenansicht aller Landungen auf einer A4-Seite (hoch, 2 Spalten), gleicher Massstab für alle.
+
+    Je Flug: Track ab `vorlauf` s vor dem Gegenanflug bis Bodennähe, Farbe = Höhe über Grund, Eckpunkte mit
+    GPS-Höhe wie am Vario, Bodennähe (≤ 1 m) mit Abstand zum Punkt, Wind (Holfuy Lehn, sonst aus den Kreisen).
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib import cm, colors
+    plt.rcParams.update({"font.size": 6.5})
+    TE, TN, TH, R = ZIELE[ziel]
+    import contextlib
+    import io
+    fl = []
+    for igc in igcs:
+        tag = Path(igc).stem[:10]                    # Holfuy Lehn aus dem Tagesarchiv, falls gesichert
+        wp = sorted((Path(__file__).resolve().parent / "archiv").glob(f"{tag}_*/roh/holfuy-1850_15min.json"))
+        with contextlib.redirect_stdout(io.StringIO()):
+            e = analyse(igc, ziel, str(wp[0]) if wp else None, False)
+        tr, agl, ecke, td = e["_intern"]
+        a = max(0, int(np.searchsorted(tr.t, tr.t[ecke["Gegenanflug"] or max(0, td - 120)] - vorlauf)))
+        fl.append((igc, e, tr, agl, ecke, td, a, tr.e[a:td + 3] - TE, tr.n[a:td + 3] - TN))
+    nz = (len(fl) + 2) // 2
+    seite = (8.27, 11.69)
+    fig = plt.figure(figsize=seite)
+    l, r_, o, u_, sp, zs = 0.03, 0.03, 0.045, 0.02, 0.02, 0.03      # Ränder (Anteil Seite)
+    bw = (1 - l - r_ - sp) / 2
+    bh = (1 - o - u_ - (nz - 1) * zs) / nz
+    vb = (bw * seite[0]) / (bh * seite[1])                          # Breite/Höhe eines Feldes
+    groesse = max(max(np.ptp(x), np.ptp(y) * vb) for *_, x, y in fl) + 70   # Fensterbreite m, für alle gleich
+    norm = colors.Normalize(0, 250)
+    for k, (igc, e, tr, agl, ecke, td, a, x, y) in enumerate(fl):
+        ax = fig.add_axes([l + (k % 2) * (bw + sp), 1 - o - (k // 2 + 1) * bh - (k // 2) * zs, bw, bh])
+        cx, cy = (x.min() + x.max()) / 2, (y.min() + y.max()) / 2
+        x0, x1, y0, y1 = cx - groesse / 2, cx + groesse / 2, cy - groesse / vb / 2, cy + groesse / vb / 2
+        _karte(ax, ziel, x0, x1, y0, y1, ebene=ebene)
+        ax.set_xlim(x0, x1); ax.set_ylim(y0, y1); ax.set_aspect("equal")
+        ax.plot(x, y, lw=0.5, color="white", zorder=2, path_effects=_kontur("black", 1.3))
+        ax.scatter(x, y, c=agl[a:td + 3], cmap="viridis", norm=norm, s=5, zorder=3, lw=0)
+        for name, i in ecke.items():
+            if i is None:
+                continue
+            ex, ny = tr.e[i] - TE, tr.n[i] - TN
+            ax.plot(ex, ny, "o", ms=4, mfc="none", mec="red", mew=1, zorder=5)
+            txt = (f"{abs(e['td_vor']):.0f} m {'kurz' if e['td_vor'] > 0 else 'weit'}" if name == "Touchdown"
+                   else f"{name[:-6]} {tr.gnss[i]:.0f}")
+            ax.annotate(txt, (ex, ny), xytext=(4, 3), textcoords="offset points", fontsize=6, bbox=_KASTEN,
+                        zorder=6, fontweight="bold" if name in ("Endanflug", "Touchdown") else "normal")
+        ax.add_patch(plt.Circle((0, 0), R, fill=False, lw=1, color="red", zorder=5))
+        ax.add_patch(plt.Circle((0, 0), 17, fill=False, ls="--", lw=0.7, color="red", zorder=5))
+        wl, hw = e["wind_landung"], e["hoehenwind"]
+        lehn = wl if e["station"] == "Holfuy Lehn" else None
+        wind = (f"Holfuy Lehn {lehn[0]:.0f}° {lehn[4]:.0f} km/h (Spitze {lehn[2]:.0f})" if lehn else
+                (f"Volten-Höhe {hw[0]:.0f}° {hw[1]:.0f} km/h" if hw else
+                 f"Wind aus Grundgeschw. {e['gs_wind'][1]:.0f} km/h" if e["gs_wind"] else ""))
+        pf = lehn or hw or e["gs_wind"]
+        if pf:
+            zu = math.radians(pf[0] + 180)
+            ax.annotate("", (0.07 + 0.045 * math.sin(zu), 0.8 + 0.045 * math.cos(zu) * vb), (0.07, 0.8),
+                        xycoords="axes fraction", arrowprops=dict(arrowstyle="-|>", color="deepskyblue", lw=2,
+                                                                  path_effects=_kontur("white", 3.5)))
+        st = Path(igc).stem
+        ax.text(0.015, 0.975, f"{st[8:10]}.{st[5:7]}. #{st[-1]} · Endanflug {e['final_kurs']:.0f}°\n{wind}",
+                transform=ax.transAxes, va="top", fontsize=6.5, bbox=_KASTEN, fontweight="bold")
+        ax.set_xticks([]); ax.set_yticks([])
+    if len(fl) % 2:                                                 # freies Feld: Legende
+        ax = fig.add_axes([l + bw + sp + 0.03, 1 - o - nz * bh - (nz - 1) * zs + 0.04, bw - 0.06, 0.012])
+        fig.colorbar(cm.ScalarMappable(norm, "viridis"), cax=ax, orientation="horizontal",
+                     label="Höhe über Grund [m]")
+        fig.text(l + bw + sp + 0.01, 1 - o - (nz - 1) * (bh + zs) - 0.01,
+                 "Kartenansicht aller Landungen in Lehn\n\n"
+                 "Alle Felder im gleichen Massstab, Norden oben.\n"
+                 f"Track ab {vorlauf:.0f} s vor dem Gegenanflug bis Bodennähe (≤ 1 m).\n"
+                 "Rote Kreise: Beginn Gegen-, Quer-, Endanflug,\n"
+                 "Zahl = GPS-Höhe am Vario (m ü. M.).\n"
+                 "Fett: Endanflug-Beginn und Abstand der Bodennähe\n"
+                 "zum Punkt (Fusskontakt 1–3 s später).\n"
+                 "Zielkreis r = 15 m, Prüfungskreis 34 m Ø gestrichelt.\n"
+                 "Pfeil: Wind (weht in Pfeilrichtung).\n"
+                 "Wind: Holfuy Lehn während der Landung (nur 31.10.),\n"
+                 "sonst auf Volten-Höhe aus den Kreisen.\n\n"
+                 "Plan: Endanflug bei 615 m (+ Korrektur Vario).",
+                 va="top", fontsize=7)
+    fig.suptitle("Landungen Lehn — Kartenansicht", y=0.995, fontsize=10, fontweight="bold")
+    OUT.mkdir(exist_ok=True)
+    for f in (OUT / "landungen_lehn_a4.png", OUT / "landungen_lehn_a4.pdf"):
+        fig.savefig(f, dpi=300)
+        print(f"Plot: {f}")
+
+
 # ------------------------------------------------------------------ Höhen-Check
 
 def gelaendehoehe(e: float, n: float) -> float:
@@ -860,6 +949,10 @@ def main(argv=None) -> int:
     k.add_argument("igc", nargs="+")
     k.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
     k.add_argument("--ebene", default=KARTE)
+    bl = sub.add_parser("blatt", help="Kartenansicht aller Landungen auf einer A4-Seite (PNG + PDF)")
+    bl.add_argument("igc", nargs="+")
+    bl.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
+    bl.add_argument("--ebene", default=KARTE)
     h = sub.add_parser("hoehen", help="GPS-/Baro-Höhe an Start und Landung gegen swissALTI3D")
     h.add_argument("igc", nargs="+")
     h.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
@@ -870,6 +963,9 @@ def main(argv=None) -> int:
     if x.cmd == "volten":
         volten([float(w) for w in x.gegenwind.split(",")], x.kurs, x.seite, x.faktor, x.flug, x.ziel, x.ebene,
                x.spicker)
+        return 0
+    if x.cmd == "blatt":
+        blatt(x.igc, x.ziel, x.ebene)
         return 0
     if x.cmd == "karte":
         karte_alle(x.igc, x.ziel, x.ebene)
