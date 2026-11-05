@@ -4,6 +4,8 @@
 Holt, was sich beim Interlaken-Briefing bewährt hat (Quellen siehe
 `.claude/skills/alleinflug-briefing/datenquellen.md`):
 
+    jetzt      Kurz-Briefing Lehn (2-min-Werte): Wind jetzt/10/30 min, Trend, Böigkeit, Berg-/Talwind seit
+               wann, Nähe zum Kipppunkt, passende Volte mit Höhen; Amisbühl/Hohwald (Wolke?).
     holfuy     Holfuy-Stationen (15-min-Werte des Tages): Wind, Böe, rF, Temperatur.
                rF 100 % über Stunden = Station steckt in der Wolke (Nebel/Stratus).
     smn        MeteoSchweiz SMN (offene Daten, 10 min): Wind, Böe, Sonne, Globalstrahlung.
@@ -22,6 +24,8 @@ Holt, was sich beim Interlaken-Briefing bewährt hat (Quellen siehe
     fahrplan   Verbindungen (transport.opendata.ch), z. B. Rückweg Landeplatz -> Startplatz.
 
 Beispiele:
+    python alleinflüge/lagecheck.py jetzt                 # Lehn + Amisbühl + Hohwald, auf den Punkt
+    python alleinflüge/lagecheck.py jetzt --bis 08:20     # Rückblick: Stand um 08:20 heute
     python alleinflüge/lagecheck.py holfuy 1850 1808 1829
     python alleinflüge/lagecheck.py smn INT THU BRZ
     python alleinflüge/lagecheck.py bise --ab 6
@@ -375,6 +379,138 @@ def _holfuy_15min(nr: str, datum: dt.date) -> list[dict]:
     return out
 
 
+# ------------------------------------------------------------------ Kurz-Briefing Lehn (jetzt)
+
+LEHN_STATIONEN = {"1850": "Lehn 560 m", "1808": "Amisbühl 1315 m", "1829": "Hohwald 1600 m"}
+
+
+def _lehn_klasse(richtung, mittel) -> str:
+    """Lehn: Bergwind = NNW–ESE (aus dem Bödeli), Talwind = SSW–WNW (vom Thunersee), sonst «anders»."""
+    if mittel is None or richtung is None:
+        return "?"
+    if mittel < 3:
+        return "still"
+    if richtung >= 340 or richtung <= 120:
+        return "Berg"
+    if 190 <= richtung <= 295:
+        return "Tal"
+    return "anders"
+
+
+def _fenster(werte: list[dict], t_end: dt.datetime, minuten: int) -> dict | None:
+    """Kennzahlen der letzten `minuten`: Vektormittel-Richtung, Mittel (arithm.), Böe max, Streuung, Klassen."""
+    import math
+    w = [x for x in werte if x["mittel"] is not None and x["richtung"] is not None
+         and t_end - dt.timedelta(minutes=minuten) < x["t"] <= t_end]
+    if not w:
+        return None
+    u = sum(x["mittel"] * math.sin(math.radians(x["richtung"])) for x in w)
+    v = sum(x["mittel"] * math.cos(math.radians(x["richtung"])) for x in w)
+    su = sum(math.sin(math.radians(x["richtung"])) for x in w) / len(w)
+    sv = sum(math.cos(math.radians(x["richtung"])) for x in w) / len(w)
+    r = min(1.0, math.hypot(su, sv))
+    streu = math.degrees(math.sqrt(-2 * math.log(r))) if r > 1e-6 else 180.0    # zirkuläre Std.-Abw.
+    return {"n": len(w), "dir": math.degrees(math.atan2(u, v)) % 360,
+            "mittel": sum(x["mittel"] for x in w) / len(w), "min": min(x["mittel"] for x in w),
+            "boee": max((x["boee"] or x["mittel"]) for x in w), "streu": streu,
+            "klassen": [_lehn_klasse(x["richtung"], x["mittel"]) for x in w],
+            "temp": [x["temp"] for x in w if x.get("temp") is not None],
+            "rf": [x["rf"] for x in w if x.get("rf") is not None]}
+
+
+def jetzt(stationen: list[str], bis: str | None = None) -> None:
+    """Kurz-Briefing für unterwegs: Lehn jetzt (10/30 min), Trend, Berg-/Talwind und Nähe zum Kipppunkt,
+    passende Volte mit Höhen; dazu Amisbühl/Hohwald in je einer Zeile (Wolke?). `bis` = HH:MM zum Testen."""
+    import math
+    heute = dt.date.today()
+    daten = {}
+    for sid in stationen:
+        roh = _holfuy_15min(sid, heute)
+        w = [{**x, "t": dt.datetime.strptime(x["zeit"], "%Y/%m/%d %H:%M:%S")} for x in roh]
+        if bis:
+            grenze = dt.datetime.combine(heute, dt.time.fromisoformat(bis))
+            w = [x for x in w if x["t"] <= grenze]
+        daten[sid] = w
+    lehn = daten.get("1850") or []
+    if not lehn:
+        print("Lehn 1850: keine Daten von heute.")
+    else:
+        t_end = lehn[-1]["t"]
+        alter = (dt.datetime.now() - t_end).total_seconds() / 60
+        f10, f30 = _fenster(lehn, t_end, 10), _fenster(lehn, t_end, 30)
+        vor = _fenster(lehn, t_end - dt.timedelta(minutes=30), 30)
+        letzt = lehn[-1]
+        kl = _lehn_klasse(f10["dir"], f10["mittel"])
+        print(f"LEHN {t_end:%H:%M}" + (f" (vor {alter:.0f} min)" if not bis else "") +
+              f": {_richtung(letzt['richtung'])} {letzt['mittel']:.0f}/{letzt['boee']:.0f} km/h")
+        print(f"  10 min: {_richtung(f10['dir'])} {f10['dir']:.0f}°, Mittel {f10['mittel']:.0f}, Böe {f10['boee']:.0f}"
+              f" | 30 min: {_richtung(f30['dir'])}, Mittel {f30['mittel']:.0f} (min {f30['min']:.0f}), "
+              f"Böe {f30['boee']:.0f}, Richtung ±{f30['streu']:.0f}°")
+        gruende = []
+        wechsel = len(set(k for k in f30["klassen"] if k in ("Berg", "Tal"))) == 2
+        if wechsel:
+            gruende.append("Berg- und Talwind wechseln sich ab (30 min)")
+        if f10["mittel"] < 3:
+            gruende.append("fast still")
+        if vor and vor["mittel"] >= 3 and f30["mittel"] < 0.6 * vor["mittel"]:
+            gruende.append(f"abflauend ({vor['mittel']:.0f} → {f30['mittel']:.0f})")
+        if f30["streu"] > 50:
+            gruende.append(f"Richtung unruhig (±{f30['streu']:.0f}°)")
+        seit = None
+        if kl in ("Berg", "Tal"):                    # Beginn der aktuellen Phase (1 Ausreisser toleriert)
+            ks = [_lehn_klasse(x["richtung"], x["mittel"]) for x in lehn]
+            i, aus = len(ks) - 1, 0
+            while i > 0 and aus <= 1:
+                aus = 0 if ks[i - 1] == kl else aus + 1
+                i -= 1
+            while ks[i] != kl:
+                i += 1
+            seit = lehn[i]["t"]
+            dauer = (t_end - seit).total_seconds() / 60
+            if dauer < 45:
+                gruende.append(f"{kl}wind erst seit {seit:%H:%M} ({dauer:.0f} min)")
+        kv = _lehn_klasse(vor["dir"], vor["mittel"]) if vor else "?"
+        if kv in ("Berg", "Tal") and kl in ("Berg", "Tal") and kv != kl:
+            gruende.append(f"vor 30–60 min noch {kv}wind → gerade gekippt")
+        trend = "" if not vor else (f"zunehmend ({vor['mittel']:.0f} → {f30['mittel']:.0f})"
+                                   if f30["mittel"] > vor["mittel"] + 2 else
+                                   f"abnehmend ({vor['mittel']:.0f} → {f30['mittel']:.0f})"
+                                   if f30["mittel"] < vor["mittel"] - 2 else "gleichbleibend")
+        boeig = f30["boee"] - f30["mittel"] > 7
+        ruhe = "böig" if boeig else ("unruhig" if f30["streu"] > 30 else "stabil")
+        print(f"  Lage: {kl + 'wind' if kl in ('Berg', 'Tal') else kl}"
+              + (f" seit {seit:%H:%M}" if seit else "") + f", {trend}, {ruhe}.")
+        frisch = seit is not None and (t_end - seit).total_seconds() < 20 * 60
+        stufe = "NAH" if (wechsel or frisch or (f10["mittel"] < 3 and len(gruende) >= 2)) else             ("MÖGLICH" if gruende else "nicht in Sicht")
+        print(f"  Kipppunkt: {stufe}" + (f" — {'; '.join(gruende)}" if gruende else ""))
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from landeanalyse import KALIB, QUER_RESERVE, ZIELE
+        TH = ZIELE["lehn"][2]
+        kurs, volte = (75, "Linksvolte, Endanflug 75°") if kl == "Berg" else \
+            ((250, "Rechtsvolte, Endanflug 250°") if kl == "Tal" else (None, None))
+        if kurs is not None:
+            u = max(0.0, f10["mittel"] * math.cos(math.radians(f10["dir"] - kurs)))
+            le = 50 * (KALIB["End"][0] - u) / 3.6 / KALIB["End"][1]
+            hq = 50 + 210 * KALIB["Quer"][1] / (math.sqrt(max(.01, KALIB["Quer"][0] ** 2 - u * u)) / 3.6) + QUER_RESERVE
+            hg = hq + (200 + le) * KALIB["Gegen"][1] / ((KALIB["Gegen"][0] + u) / 3.6)
+            print(f"  Volte jetzt: {volte}, Gegenwind {u:.0f} → Gegen {TH + hg:.0f} · Quer {TH + hq:.0f} · End 615, "
+                  f"eindrehen {round(le / 5) * 5:.0f} m vor dem Punkt (+ Vario-Korrektur)")
+        else:
+            print("  Volte jetzt: Windsack entscheidet; Zeile 0 km/h (Gegen 732 · Quer 665 · End 615, 195 m)")
+        if f30["temp"] and vor and vor["temp"]:
+            print(f"  Temperatur Lehn {f30['temp'][-1]:.1f} °C ({f30['temp'][-1] - vor['temp'][0]:+.1f} in 1 h)")
+    for sid in stationen:
+        if sid == "1850" or not daten.get(sid):
+            continue
+        w = daten[sid]
+        f = _fenster(w, w[-1]["t"], 30)
+        if not f:
+            continue
+        rf = (f"rF {f['rf'][-1]:.0f} %" + (" → in der Wolke" if min(f["rf"]) >= 98 else "")) if f["rf"] else ""
+        print(f"{LEHN_STATIONEN.get(sid, sid)} {w[-1]['t']:%H:%M}: {_richtung(f['dir'])} Mittel {f['mittel']:.0f}, "
+              f"Böe {f['boee']:.0f} (30 min), {rf}")
+
+
 def _smn_tag_csv(abk: str, datum: dt.date) -> str:
     """MeteoSchweiz SMN 10-min-Rohzeilen (UTC) eines Tages; t_now für heute, sonst t_recent."""
     s = abk.lower()
@@ -522,6 +658,9 @@ def main(argv: list[str] | None = None) -> int:
     pg.add_argument("--plz", default="380000", help="sechsstellig, z. B. 380000 Interlaken")
     pg.add_argument("--datum", default=(dt.date.today() + dt.timedelta(days=1)).isoformat())
     pg.add_argument("--stunden", default="7-17"); pg.add_argument("--region", default="north")
+    j = sub.add_parser("jetzt", help="Kurz-Briefing Lehn: Wind jetzt, Trend, Berg-/Talwind-Kipppunkt, Volte")
+    j.add_argument("ids", nargs="*", default=["1850", "1808", "1829"])
+    j.add_argument("--bis", metavar="HH:MM", help="nur Daten bis zu dieser Uhrzeit (Test/Rückblick)")
     r = sub.add_parser("archiv"); r.add_argument("datum"); r.add_argument("name")
     r.add_argument("ids", nargs="+", help="winds.mobi-IDs")
     r.add_argument("--punkt", metavar="LAT,LON", help="zusätzlich Modell an diesem Punkt")
@@ -552,6 +691,8 @@ def main(argv: list[str] | None = None) -> int:
         print(modell(a.lat, a.lon, a.tage, a.vortage, _std(a.stunden)))
     elif a.cmd == "prognose":
         prognose(a.plz, dt.date.fromisoformat(a.datum), _std(a.stunden), a.region)
+    elif a.cmd == "jetzt":
+        jetzt(a.ids, a.bis)
     elif a.cmd == "archiv":
         archiv(dt.date.fromisoformat(a.datum), a.name, a.ids, a.punkt, _std(a.stunden))
     return 0

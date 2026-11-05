@@ -81,7 +81,7 @@ Auswärtige Flugschulen: Online-Registrierung beim DCI.
 
 | Station | Höhe | Wozu | Abruf |
 |---|---|---|---|
-| **Holfuy 1850 Lehn** | 560 m | Wind am Landeplatz: Berg-/Talwind, Volte, Lee-Regel Luegibrüggli | `lagecheck.py holfuy 1850` |
+| **Holfuy 1850 Lehn** | 560 m | Wind am Landeplatz: Berg-/Talwind, Volte, Lee-Regel Luegibrüggli | `lagecheck.py holfuy 1850`; unterwegs kurz: `lagecheck.py jetzt` |
 | **Holfuy 1808 Amisbühl** | 1315 m | **≈ Bergbo** (250 m daneben): Startplatz in der Wolke? (rF) | `holfuy 1808` |
 | **Holfuy 1829 Hohwald** | 1600 m | über/unter Nebelobergrenze? | `holfuy 1829` |
 | MeteoSchweiz INT Interlaken | 578 m | Sonne/Strahlung (Hochnebel?) | `lagecheck.py smn INT` |
