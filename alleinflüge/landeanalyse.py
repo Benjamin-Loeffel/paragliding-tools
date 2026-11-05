@@ -199,6 +199,14 @@ def analyse(pfad: str, ziel: str, windpfad: str | None, plot: bool) -> dict:
     wind = lade_wind(windpfad, tr.utc_offset_h)
     t_start = tr.t[ecke["Gegenanflug"]] if ecke["Gegenanflug"] is not None else tr.t[td] - 180
     w = wind_im_fenster(wind, t_start - 300, tr.t[td] + 300)
+    # Station während der Landung: Beginn Gegenanflug bis Touchdown (+120 s, damit der 2-min-Wert mit dem
+    # Touchdown drin ist; Holfuy-Zeitstempel = Ende des Mittelungsintervalls)
+    wl = wind_im_fenster(wind, t_start, tr.t[td] + 120)
+    if wl:                                            # + arithmetisches Mittel der Mittelwerte (wie Holfuy-Anzeige)
+        vs = [v for t, _, v, _ in wind if t_start <= t <= tr.t[td] + 120]
+        wl = (*wl, sum(vs) / len(vs))
+    stat = "Holfuy Lehn" if windpfad and "holfuy-1850" in windpfad else \
+        (f"MeteoSchweiz {Path(windpfad).name.split('_')[0].split('-')[-1]} (nicht Lehn)" if windpfad else None)
     hw = hoehenwind(tr, agl, td)
     wx = wy = 0.0
     gs_wind = _wind_aus_gs(tr, ecke, final)
@@ -220,6 +228,7 @@ def analyse(pfad: str, ziel: str, windpfad: str | None, plot: bool) -> dict:
                 "vorhalt": float(crab)}
 
     erg = {"datei": Path(pfad).name, "final_kurs": final, "wind": w, "hoehenwind": hw, "gs_wind": gs_wind,
+           "wind_landung": wl, "station": stat, "fenster_landung": (_hms(t_start), _hms(tr.t[td])),
            "td_agl_e": float(agl[e0]), "e_dist": float(math.hypot(dx[e0], dy[e0])), "gnss_off": gnss_off,
            "regeln": pruefregeln(tr, kurs, final, ecke, td, vor, rechts, quelle, (TE, TN), R),
            "td_zeit": _hms(tr.t[td]), "td_vor": float(vor[td]), "td_rechts": float(rechts[td]),
@@ -335,6 +344,10 @@ def _drucke(erg: dict) -> None:
         print(f"   Wind Station (Volte ±5 min): aus {w[0]:.0f}° {w[1]:.1f} km/h, Böe max {w[2]:.0f} "
               f"({w[3]} Werte)  -> Gegenwind im Endanflug "
               f"{w[1] * math.cos(math.radians(w[0] - erg['final_kurs'])):+.1f} km/h (Mast 10 m)")
+    wl = erg["wind_landung"]
+    if wl:
+        print(f"   {erg['station']} während der Landung ({erg['fenster_landung'][0]}–{erg['fenster_landung'][1]}): "
+              f"aus {wl[0]:.0f}°, Mittel {wl[4]:.0f} km/h, Spitze {wl[2]:.0f} km/h ({wl[3]} Werte)")
     if hw:
         print(f"   Wind Volten-Höhe (aus {hw[3]} Kreis-Fenstern 120–450 m AGL): aus {hw[0]:.0f}° {hw[1]:.1f} km/h, "
               f"Luft im Kreis {hw[2]:.0f} km/h -> Gegenwind im Endanflug "
@@ -391,14 +404,21 @@ def _plot(tr, agl, vor, rechts, ecke, td, erg, ziel, rand: float = 150, sued: fl
     ax1.set_aspect("equal")
     x0, x1, y0, y1 = _rand(np.r_[ex[a:b], 0], np.r_[ny[a:b], 0], rand)
     _karte(ax1, ziel, x0, x1, y0 - sued, y1)
-    w = erg["wind"]
-    if w:                                             # Windpfeil oben links, weht NACH (aus w[0])
-        zu = math.radians(w[0] + 180)
-        ax1.annotate("", (0.06 + 0.05 * math.sin(zu), 0.90 + 0.05 * math.cos(zu)), (0.06, 0.90),
+    wl, hw = erg["wind_landung"], erg["hoehenwind"]
+    lehn = wl if erg["station"] == "Holfuy Lehn" else None   # andere Stationen sind für Lehn nicht repräsentativ
+    zeilen = [f"Holfuy Lehn {erg['fenster_landung'][0][:5]}–{erg['fenster_landung'][1][:5]} (Gegenanflug → Landung):",
+              f"aus {lehn[0]:.0f}° · Mittel {lehn[4]:.0f} km/h · Spitze {lehn[2]:.0f} km/h"] if lehn else \
+        ["Holfuy Lehn: keine Daten (Holfuy speichert nur 7 Tage)"]
+    if hw:
+        zeilen.append(f"Volten-Höhe (aus deinen Kreisen): aus {hw[0]:.0f}° {hw[1]:.0f} km/h")
+    pfeil = lehn or hw
+    if pfeil:                                         # Windpfeil oben links, weht NACH (aus pfeil[0])
+        zu = math.radians(pfeil[0] + 180)
+        ax1.annotate("", (0.06 + 0.05 * math.sin(zu), 0.86 + 0.05 * math.cos(zu)), (0.06, 0.86),
                      xycoords="axes fraction", arrowprops=dict(arrowstyle="-|>", color="deepskyblue", lw=3,
                                                                path_effects=_kontur("white", 5)))
-        ax1.text(0.06, 0.97, f"Wind Station aus {w[0]:.0f}° {w[1]:.0f}/{w[2]:.0f} km/h", transform=ax1.transAxes,
-                 fontsize=8, bbox=_KASTEN)
+    ax1.text(0.02, 0.98, "\n".join(zeilen), transform=ax1.transAxes, fontsize=8.5, va="top", bbox=_KASTEN,
+             fontweight="bold" if lehn else "normal")
     ax1.set_xlabel("Osten [m] ab Zielpunkt")
     ax1.set_ylabel("Norden [m] ab Zielpunkt")
     ax1.set_title(f"Grundriss (Norden oben), Zielkreis r = {R:.0f} m, Prüfungskreis 34 m Ø gestrichelt")
@@ -489,17 +509,23 @@ def _still(igc: str, ziel: str) -> dict:
 
 
 def volten(winde: list[float], kurs: float, seite: str, faktor: float, igcs: list[str], ziel: str,
-           ebene: str) -> None:
+           ebene: str, spicker: bool = False) -> None:
     """Landevolten je Gegenwind auf der swisstopo-Karte, Endanflug ab 50 m AGL (Planmodell).
 
     Geometrie wie geflogen: Gegenanflug 210 m neben der Achse ab 200 m hinter dem Punkt (Positionsraum
     luvseitig), Queranflug quer zur Achse, Endanflug-Länge je Wind = Gleitweg ab 50 m (KALIB End).
+    Zahlen = GPS-Höhe m ü. M. wie am Vario (Zielhöhe + AGL). `spicker`: kleines Bild mit grosser Schrift
+    für den A4-Spicker (ohne geflogene Tracks).
     """
     from thermalmodel.plotstyle import use
     plt = use()
     sg = 1 if seite == "rechts" else -1
     Q, P = GEOM["Quer"], 200.0
-    fig, ax = plt.subplots(figsize=(15, 12))
+    TH = ZIELE[ziel][2]
+    fs = 1.45 if spicker else 1.0                     # Schriftfaktor
+    fig, ax = plt.subplots(figsize=(7.5, 6.2) if spicker else (15, 12))
+    if spicker:
+        igcs = []
     farben = plt.get_cmap("plasma")(np.linspace(0.05, 0.85, len(winde)))
     pkt = []
     for j, (u, c) in enumerate(sorted(zip(winde, farben), key=lambda z: -z[0])):
@@ -512,16 +538,17 @@ def volten(winde: list[float], kurs: float, seite: str, faktor: float, igcs: lis
         x, y = _aus_achse([-P, le, le, 0], [sg * Q, sg * Q, 0, 0], kurs)
         pkt += list(zip(x, y))
         ax.plot(x, y, "-", color=c, lw=2.2, zorder=3, path_effects=_kontur("white", 4),
-                label=f"Gegenwind {u:.0f} km/h (Mast ≈ {u / faktor:.0f}): Gegen {h_g:.0f} m · Quer {h_q:.0f} m"
-                      f" · End 50 m bei {le:.0f} m")
+                label=f"Holfuy {u / faktor:.0f} km/h" if spicker else
+                      (f"Gegenwind {u:.0f} km/h (Mast ≈ {u / faktor:.0f}): Gegen {TH + h_g:.0f} m · "
+                       f"Quer {TH + h_q:.0f} m · End {TH + 50:.0f} m bei {le:.0f} m"))
         ax.plot(x[:3], y[:3], "o", color=c, ms=6, mec="k", mew=0.5, zorder=4)
-        for xi, yi, hh, dy in ((x[0], y[0], h_g, 5 + 11 * j), (x[1], y[1], h_q, 5), (x[2], y[2], 50, -12)):
-            ax.annotate(f"{hh:.0f}", (xi, yi), xytext=(5, dy), textcoords="offset points",
-                        fontsize=8, color=c, fontweight="bold", zorder=5, path_effects=_kontur("white", 2.5))
+        for xi, yi, hh, dy in ((x[0], y[0], h_g, 5 + 11 * fs * j), (x[1], y[1], h_q, 5), (x[2], y[2], 50, -12 * fs)):
+            ax.annotate(f"{TH + hh:.0f}", (xi, yi), xytext=(5, dy), textcoords="offset points",
+                        fontsize=8 * fs, color=c, fontweight="bold", zorder=5, path_effects=_kontur("white", 2.5))
     # Positionsraum (Höhenabbau, Achten) luvseitig hinter dem Punkt
     cx, cy = _aus_achse([-P - 70], [sg * Q * 0.75], kurs)
     ax.add_patch(plt.Circle((cx[0], cy[0]), 90, fc="lime", alpha=0.12, ec="lime", lw=1.2, zorder=2))
-    ax.text(cx[0], cy[0], "Positionsraum\n(luvseitig)", ha="center", va="center", fontsize=8, color="darkgreen",
+    ax.text(cx[0], cy[0], "Positionsraum\n(luvseitig)", ha="center", va="center", fontsize=8 * fs, color="darkgreen",
             bbox=_KASTEN)
     TE, TN = ZIELE[ziel][:2]
     for igc in igcs:                                # geflogene Volten darüber
@@ -534,12 +561,12 @@ def volten(winde: list[float], kurs: float, seite: str, faktor: float, igcs: lis
             i = ecke[k]
             if i is not None:
                 ax.plot(tr.e[i] - TE, tr.n[i] - TN, "s", ms=5, color="white", mec="k", zorder=4)
-                ax.annotate(f"{agl[i]:.0f}", (tr.e[i] - TE, tr.n[i] - TN), xytext=(-18, 4),
+                ax.annotate(f"{TH + agl[i]:.0f}", (tr.e[i] - TE, tr.n[i] - TN), xytext=(-18, 4),
                             textcoords="offset points", fontsize=7.5, bbox=_KASTEN)
     if igcs:
         ax.plot([], [], "-s", color="white", mec="k", lw=1.0, ms=5, path_effects=_kontur("black", 2.2),
                 label="geflogen: " + ", ".join(f"{Path(i).stem[:10]} #{Path(i).stem[-1]}" for i in igcs)
-                      + " (Eckpunkte m AGL)")
+                      + " (Eckpunkte m ü. M.)")
     R = ZIELE[ziel][3]
     ax.add_patch(plt.Circle((0, 0), R, fill=False, lw=1.5, color="red", zorder=5))
     ax.add_patch(plt.Circle((0, 0), 17, fill=False, lw=1.0, ls="--", color="red", zorder=5))
@@ -547,19 +574,27 @@ def volten(winde: list[float], kurs: float, seite: str, faktor: float, igcs: lis
     ax.annotate("", (0.92 + 0.05 * math.sin(zu), 0.90 + 0.05 * math.cos(zu)), (0.92, 0.90),
                 xycoords="axes fraction", arrowprops=dict(arrowstyle="-|>", color="deepskyblue", lw=3,
                                                           path_effects=_kontur("white", 5)))
-    ax.text(0.92, 0.97, f"Wind aus {kurs % 360:.0f}°", transform=ax.transAxes, color="steelblue", fontsize=9,
-            ha="center", bbox=_KASTEN)
+    if not spicker:
+        ax.text(0.92, 0.97, f"Wind aus {kurs % 360:.0f}°", transform=ax.transAxes, color="steelblue", fontsize=9,
+                ha="center", bbox=_KASTEN)
     ax.set_aspect("equal")
     xs, ys = zip(*pkt)
     _karte(ax, ziel, *_rand(np.r_[xs, cx], np.r_[ys, cy], 60), ebene=ebene)
-    ax.set_xlabel("Osten [m] ab Zielpunkt")
-    ax.set_ylabel("Norden [m] ab Zielpunkt")
-    ax.set_title(f"Landevolten Lehn — {'Rechts' if sg > 0 else 'Links'}volte, Endanflug {kurs:.0f}°, "
-                 f"Endanflug ab 50 m AGL; Zahlen = Höhe AGL am Eckpunkt (Planmodell, 7 Flüge); "
-                 f"geflogen ab {VORLAUF // 60} min vor dem Gegenanflug", fontsize=10)
-    ax.legend(loc="lower left", fontsize=7.5, framealpha=0.9)
+    if spicker:
+        ax.set_xticks([]); ax.set_yticks([])
+        ax.set_title(f"{'Rechts' if sg > 0 else 'Links'}volte · Endanflug {kurs:.0f}° · "
+                     f"{'Talwind' if sg > 0 else 'Bergwind'} aus {kurs % 360:.0f}°", fontsize=11 * fs)
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.01), ncol=len(winde), fontsize=9.5,
+                  frameon=False, handlelength=1.5, columnspacing=1.2)
+    else:
+        ax.set_xlabel("Osten [m] ab Zielpunkt")
+        ax.set_ylabel("Norden [m] ab Zielpunkt")
+        ax.set_title(f"Landevolten Lehn — {'Rechts' if sg > 0 else 'Links'}volte, Endanflug {kurs:.0f}°, "
+                     f"Endanflug ab {TH + 50:.0f} m; Zahlen = GPS-Höhe m ü. M. am Eckpunkt (Planmodell, 7 Flüge); "
+                     f"geflogen ab {VORLAUF // 60} min vor dem Gegenanflug", fontsize=10)
+        ax.legend(loc="lower left", fontsize=7.5, framealpha=0.9)
     OUT.mkdir(exist_ok=True)
-    f = OUT / f"volten_lehn_{kurs:.0f}_{seite}.png"
+    f = OUT / f"volten_lehn_{kurs:.0f}_{seite}{'_spicker' if spicker else ''}.png"
     fig.savefig(f)
     print(f"Plot: {f}")
 
@@ -811,6 +846,7 @@ def main(argv=None) -> int:
     v.add_argument("--flug", nargs="*", default=[], help="geflogene IGC zum Vergleich darüberlegen")
     v.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
     v.add_argument("--ebene", default=KARTE, help="WMS-Ebene (Landeskarte: ch.swisstopo.pixelkarte-farbe)")
+    v.add_argument("--spicker", action="store_true", help="kleines Bild mit grosser Schrift für den A4-Spicker")
     k = sub.add_parser("karte", help="alle Landungen auf einer Karte")
     k.add_argument("igc", nargs="+")
     k.add_argument("--ziel", default="lehn", choices=sorted(ZIELE))
@@ -823,7 +859,8 @@ def main(argv=None) -> int:
         hoehen(x.igc, x.ziel)
         return 0
     if x.cmd == "volten":
-        volten([float(w) for w in x.gegenwind.split(",")], x.kurs, x.seite, x.faktor, x.flug, x.ziel, x.ebene)
+        volten([float(w) for w in x.gegenwind.split(",")], x.kurs, x.seite, x.faktor, x.flug, x.ziel, x.ebene,
+               x.spicker)
         return 0
     if x.cmd == "karte":
         karte_alle(x.igc, x.ziel, x.ebene)
