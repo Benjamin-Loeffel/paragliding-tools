@@ -172,6 +172,12 @@ Halbstundentakt ~85–90 min (24.09.: Starts 09:50 / 11:15 / 12:46).
   - Amisbühl an 4 von 6 Tagen ganz oder zeitweise in der Wolke (rF ≥ 97 %), Hohwald nur am 02./03.11.
   - **ICON-CH1 kennt den Lehn-Bergwind nicht:** zeigt fast immer WSW; um 8 h 5 von 6 Mal falsche
     Richtung, mittags nur an den Sonnentagen richtig.
+- **05.11.2026** (Tag vor der Prüfung; Archiv `alleinflüge/archiv/2026-11-05_interlaken/`): Föhn auf den
+  Kämmen (Lugano−Zürich morgens +4.0 hPa, Grimsel SSE 22–32, Jungfraujoch SE 35), unten nicht durchgebrochen,
+  ab Mittag +0.6. Nebelmeer über dem Thunersee 07–08 h, 09–10 h ins Bödeli geschoben, ab 11 h aufgelöst;
+  Amisbühl/Hohwald trocken (43–62 %) → Obergrenze < 1300 m. Lehn: NE 3–6 bis 07:40, still, **WSW ab 08:07**
+  (6–12 km/h, vor der Sonne um 10 h; INT/Meiringen gleichzeitig WNW–NW → vermutlich Ausgleichsströmung zur
+  Föhntendenz, nicht thermisch), ab 14:15 drehend, **ab 15:23 E** (Abendbergwind). ICON-CH1 lag richtig.
 - **Alle 7 Landungen (24.09.–31.10.):** 6 von 7 lagen 6–28 m zu kurz (Median 10 m). Der Landeplan
   rechnet darum mit dem hohen Sinken (1.8 m/s) und lässt Überhöhe mit S-Kurven abbauen.
   - Archiv: `alleinflüge/archiv/2026-10-31_interlaken/`.
