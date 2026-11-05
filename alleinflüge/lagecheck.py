@@ -418,7 +418,102 @@ def _fenster(werte: list[dict], t_end: dt.datetime, minuten: int) -> dict | None
             "rf": [x["rf"] for x in w if x.get("rf") is not None]}
 
 
-def jetzt(stationen: list[str], bis: str | None = None) -> None:
+LEHN_PUNKT = (46.6808, 7.8236)
+
+
+def _modell_lehn(stunden_zurueck: int = 7, stunden_vor: int = 7) -> dict[str, list[tuple]]:
+    """ICON-CH1/CH2 10 m am Landeplatz Lehn, stündlich (Open-Meteo): [(Zeit, Richtung, Mittel, Böe)]."""
+    out = {}
+    for m, name in (("meteoswiss_icon_ch1", "ICON-CH1"), ("meteoswiss_icon_ch2", "ICON-CH2")):
+        try:
+            r = requests.get("https://api.open-meteo.com/v1/forecast", timeout=60, params={
+                "latitude": LEHN_PUNKT[0], "longitude": LEHN_PUNKT[1], "timezone": "Europe/Zurich",
+                "wind_speed_unit": "kmh", "models": m, "past_hours": stunden_zurueck,
+                "forecast_hours": stunden_vor, "hourly": "wind_speed_10m,wind_direction_10m,wind_gusts_10m"}).json()
+            h = r["hourly"]
+            out[name] = [(dt.datetime.fromisoformat(t), d, v, g) for t, d, v, g in
+                         zip(h["time"], h["wind_direction_10m"], h["wind_speed_10m"], h["wind_gusts_10m"])
+                         if v is not None]
+        except Exception as e:                       # Modell fehlt -> Grafik trotzdem
+            print(f"  ({name} nicht geladen: {e})")
+    return out
+
+
+def _grafik_lehn(lehn: list[dict], titel: str, jetzt_t: dt.datetime, stunden: int = 6) -> Path:
+    """Grafik wie winds.mobi: Holfuy Lehn (2 min) der letzten `stunden` h + ICON-CH1/CH2 (vorher zum Prüfen,
+    danach als Prognose). Hintergrund = Berg-/Talwind, Pfeile = wohin der Wind weht."""
+    import math
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.dates as mdates
+    import matplotlib.pyplot as plt
+    farbe = {"Berg": "#2b6cb0", "Tal": "#dd6b20", "still": "#a0aec0", "anders": "#805ad5", "?": "#a0aec0"}
+    t0, t1 = jetzt_t - dt.timedelta(hours=stunden), jetzt_t + dt.timedelta(hours=stunden)
+    w = [x for x in lehn if x["t"] >= t0 and x["mittel"] is not None]
+    mod = _modell_lehn(stunden + 1, stunden + 1)
+    plt.rcParams.update({"font.size": 7})
+    fig, (ap, ax) = plt.subplots(2, 1, figsize=(6.2, 5.4), dpi=250, sharex=True,
+                                 gridspec_kw={"height_ratios": [0.9, 3.2], "hspace": 0.02})
+    # Hintergrund: gemessene Phase je 2-min-Wert
+    for a, b in zip(w, w[1:] + [None]):
+        b_t = b["t"] if b else a["t"] + dt.timedelta(minutes=2)
+        ax.axvspan(a["t"], b_t, color=farbe[_lehn_klasse(a["richtung"], a["mittel"])], alpha=0.16, lw=0)
+    ax.fill_between([x["t"] for x in w], [x["mittel"] for x in w], color="#38a169", alpha=0.25, lw=0)
+    ax.plot([x["t"] for x in w], [x["mittel"] for x in w], color="#2f855a", lw=1.4, label="Holfuy Lehn Mittel (2 min)")
+    ax.plot([x["t"] for x in w], [x["boee"] for x in w], color="#2f855a", lw=0.9, ls="--", label="Holfuy Böe")
+    stil = {"ICON-CH1": ("#c53030", "-"), "ICON-CH2": ("#6b46c1", "-")}
+    for name, reihe in mod.items():
+        r = [x for x in reihe if t0 - dt.timedelta(hours=1) <= x[0] <= t1]
+        c, ls = stil[name]
+        ax.plot([x[0] for x in r], [x[2] for x in r], color=c, lw=1.1, ls=ls, marker="o", ms=2,
+                label=f"{name} Mittel (stündl.)")
+        ax.plot([x[0] for x in r], [x[3] for x in r], color=c, lw=0.6, ls=":", label=f"{name} Böe")
+    ax.axvline(jetzt_t, color="k", lw=0.8)
+    ax.text(jetzt_t, 0.99, " jetzt → Prognose", transform=ax.get_xaxis_transform(), va="top", fontsize=6.5,
+            fontweight="bold")
+    ax.set_ylabel("km/h")
+    ax.set_ylim(0, max([12] + [x["boee"] or 0 for x in w] + [x[3] for r in mod.values() for x in r
+                                                         if t0 <= x[0] <= t1]) * 1.1)
+    ax.grid(lw=0.3, alpha=0.6)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.07), fontsize=5.8, ncol=3, frameon=False)
+    ax.set_xlim(t0, t1)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+    ax.xaxis.set_major_locator(mdates.HourLocator())
+    # Pfeilzeilen: gemessen (10-min-Vektormittel) und Modelle; Pfeil = wohin der Wind weht
+    zeilen = [("Holfuy", 2.0)] + [(n, 1.0 - 0.9 * k) for k, n in enumerate(mod)]
+    for name, y in zeilen:
+        if name == "Holfuy":
+            pfeile, t = [], t0
+            while t < jetzt_t:
+                f = _fenster(w, t + dt.timedelta(minutes=15), 15)
+                if f:
+                    pfeile.append((t + dt.timedelta(minutes=7.5), f["dir"], f["mittel"]))
+                t += dt.timedelta(minutes=15)
+        else:
+            pfeile = [(x[0], x[1], x[2]) for x in mod[name] if t0 <= x[0] <= t1]
+        if pfeile:                                   # quiver mit angles="uv": Richtung bildschirmtreu
+            zu = [math.radians(d + 180) for _, d, _ in pfeile]
+            ap.quiver([mdates.date2num(t) for t, *_ in pfeile], [y] * len(pfeile),
+                      [math.sin(z) for z in zu], [math.cos(z) for z in zu],
+                      color=[farbe[_lehn_klasse(d, v)] for _, d, v in pfeile], angles="uv", pivot="middle",
+                      scale=50 if name == "Holfuy" else 38, width=0.0030 if name == "Holfuy" else 0.0042, headwidth=3.5, headlength=4, headaxislength=3.5)
+        ap.text(-0.01, y, name, transform=ap.get_yaxis_transform(), ha="right", va="center", fontsize=6)
+    ap.set_ylim(-0.5, 2.5)
+    ap.set_yticks([])
+    ap.axvline(jetzt_t, color="k", lw=0.8)
+    for sp in ("top", "right", "left"):
+        ap.spines[sp].set_visible(False)
+    ap.set_title(titel, fontsize=7.5, loc="left", fontweight="bold")
+    fig.text(0.99, -0.02, "Hintergrund/Pfeile: blau = Bergwind (N–ESE), orange = Talwind (SSW–WNW), grau = still "
+             "< 3 km/h · Pfeil zeigt, wohin der Wind weht · Modell = 10 m am Gitterpunkt Lehn (Open-Meteo)",
+             ha="right", fontsize=5, color="#4a5568")
+    OUT.mkdir(exist_ok=True)
+    f = OUT / "jetzt_lehn.png"
+    fig.savefig(f, bbox_inches="tight")
+    plt.close(fig)
+    return f
+
+def jetzt(stationen: list[str], bis: str | None = None, grafik: bool = True) -> None:
     """Kurz-Briefing für unterwegs: Lehn jetzt (10/30 min), Trend, Berg-/Talwind und Nähe zum Kipppunkt,
     passende Volte mit Höhen; dazu Amisbühl/Hohwald in je einer Zeile (Wolke?). `bis` = HH:MM zum Testen."""
     import math
@@ -483,6 +578,11 @@ def jetzt(stationen: list[str], bis: str | None = None) -> None:
         frisch = seit is not None and (t_end - seit).total_seconds() < 20 * 60
         stufe = "NAH" if (wechsel or frisch or (f10["mittel"] < 3 and len(gruende) >= 2)) else             ("MÖGLICH" if gruende else "nicht in Sicht")
         print(f"  Kipppunkt: {stufe}" + (f" — {'; '.join(gruende)}" if gruende else ""))
+        if grafik:
+            titel = (f"Lehn {t_end:%d.%m. %H:%M}: {_richtung(f10['dir'])} {f10['mittel']:.0f} km/h, Böe {f10['boee']:.0f}"
+                     f" (10 min) · {kl + 'wind' if kl in ('Berg', 'Tal') else kl}"
+                     + (f" seit {seit:%H:%M}" if seit else "") + f" · Kipppunkt {stufe.lower()}")
+            print(f"  Grafik: {_grafik_lehn(lehn, titel, t_end)}")
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from landeanalyse import KALIB, QUER_RESERVE, ZIELE
         TH = ZIELE["lehn"][2]
@@ -661,6 +761,7 @@ def main(argv: list[str] | None = None) -> int:
     j = sub.add_parser("jetzt", help="Kurz-Briefing Lehn: Wind jetzt, Trend, Berg-/Talwind-Kipppunkt, Volte")
     j.add_argument("ids", nargs="*", default=["1850", "1808", "1829"])
     j.add_argument("--bis", metavar="HH:MM", help="nur Daten bis zu dieser Uhrzeit (Test/Rückblick)")
+    j.add_argument("--keine-grafik", action="store_true", help="ohne PNG (Holfuy 6 h + ICON-CH1/CH2 ±6 h)")
     r = sub.add_parser("archiv"); r.add_argument("datum"); r.add_argument("name")
     r.add_argument("ids", nargs="+", help="winds.mobi-IDs")
     r.add_argument("--punkt", metavar="LAT,LON", help="zusätzlich Modell an diesem Punkt")
@@ -692,7 +793,7 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd == "prognose":
         prognose(a.plz, dt.date.fromisoformat(a.datum), _std(a.stunden), a.region)
     elif a.cmd == "jetzt":
-        jetzt(a.ids, a.bis)
+        jetzt(a.ids, a.bis, not a.keine_grafik)
     elif a.cmd == "archiv":
         archiv(dt.date.fromisoformat(a.datum), a.name, a.ids, a.punkt, _std(a.stunden))
     return 0
