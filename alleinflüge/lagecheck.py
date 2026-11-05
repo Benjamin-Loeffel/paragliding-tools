@@ -421,65 +421,91 @@ def _fenster(werte: list[dict], t_end: dt.datetime, minuten: int) -> dict | None
 LEHN_PUNKT = (46.6808, 7.8236)
 
 
-def _modell_lehn(stunden_zurueck: int = 7, stunden_vor: int = 7) -> dict[str, list[tuple]]:
-    """ICON-CH1/CH2 10 m am Landeplatz Lehn, stündlich (Open-Meteo): [(Zeit, Richtung, Mittel, Böe)]."""
+def _modell_lehn(stunden_zurueck: int = 7, stunden_vor: int = 7) -> dict[str, dict]:
+    """ICON-CH1-EPS (11 Member) und ICON-CH2-EPS (21) 10 m am Landeplatz Lehn, stündlich (Open-Meteo Ensemble).
+
+    Je Modell: Zeiten, Kontrolllauf (= deterministisch) Richtung/Mittel/Böe, 10–90-%-Band des Mittelwinds und
+    Anteil der Member mit Berg-/Talwind/still je Stunde."""
+    import math
     out = {}
-    for m, name in (("meteoswiss_icon_ch1", "ICON-CH1"), ("meteoswiss_icon_ch2", "ICON-CH2")):
+    for m, name in (("meteoswiss_icon_ch1_ensemble", "ICON-CH1"), ("meteoswiss_icon_ch2_ensemble", "ICON-CH2")):
         try:
-            r = requests.get("https://api.open-meteo.com/v1/forecast", timeout=60, params={
+            h = requests.get("https://ensemble-api.open-meteo.com/v1/ensemble", timeout=60, params={
                 "latitude": LEHN_PUNKT[0], "longitude": LEHN_PUNKT[1], "timezone": "Europe/Zurich",
-                "wind_speed_unit": "kmh", "models": m, "past_hours": stunden_zurueck,
-                "forecast_hours": stunden_vor, "hourly": "wind_speed_10m,wind_direction_10m,wind_gusts_10m"}).json()
-            h = r["hourly"]
-            out[name] = [(dt.datetime.fromisoformat(t), d, v, g) for t, d, v, g in
-                         zip(h["time"], h["wind_direction_10m"], h["wind_speed_10m"], h["wind_gusts_10m"])
-                         if v is not None]
+                "wind_speed_unit": "kmh", "models": m, "past_hours": stunden_zurueck, "forecast_hours": stunden_vor,
+                "hourly": "wind_speed_10m,wind_direction_10m,wind_gusts_10m"}).json()["hourly"]
         except Exception as e:                       # Modell fehlt -> Grafik trotzdem
             print(f"  ({name} nicht geladen: {e})")
+            continue
+        mem = [k[len("wind_speed_10m"):] for k in h if k.startswith("wind_speed_10m")]   # "" = Kontrolllauf
+        reihe = []
+        for i, t in enumerate(h["time"]):
+            v = [h["wind_speed_10m" + k][i] for k in mem]
+            d = [h["wind_direction_10m" + k][i] for k in mem]
+            ok = [(vv, dd) for vv, dd in zip(v, d) if vv is not None and dd is not None]
+            if not ok or h["wind_speed_10m"][i] is None:
+                continue
+            kl = [_lehn_klasse(dd, vv) for vv, dd in ok]
+            vs = sorted(vv for vv, _ in ok)
+            q = lambda f: vs[min(len(vs) - 1, max(0, round(f * (len(vs) - 1))))]
+            reihe.append({"t": dt.datetime.fromisoformat(t), "dir": h["wind_direction_10m"][i],
+                          "mittel": h["wind_speed_10m"][i], "boee": h["wind_gusts_10m"][i],
+                          "q10": q(0.1), "q90": q(0.9), "n": len(ok),
+                          **{k: kl.count(k) / len(kl) for k in ("Berg", "Tal", "still", "anders")}})
+        out[name] = reihe
     return out
 
 
 def _grafik_lehn(lehn: list[dict], titel: str, jetzt_t: dt.datetime, stunden: int = 6) -> Path:
-    """Grafik wie winds.mobi: Holfuy Lehn (2 min) der letzten `stunden` h + ICON-CH1/CH2 (vorher zum Prüfen,
-    danach als Prognose). Hintergrund = Berg-/Talwind, Pfeile = wohin der Wind weht."""
+    """Grafik für unterwegs: oben Pfeile (wohin der Wind weht), Mitte Mittel/Böe Holfuy Lehn (2 min) der letzten
+    `stunden` h und ICON-CH1/CH2 (Kontrolllauf + 10–90-%-Band der Ensembles, vorher zum Prüfen, danach Prognose),
+    unten links Radar (Richtung/Stärke: Holfuy letzte Stunde, Modelle −1…+3 h), unten rechts Anteil der Member
+    mit Tal-/Bergwind je Stunde."""
     import math
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.dates as mdates
     import matplotlib.pyplot as plt
     farbe = {"Berg": "#2b6cb0", "Tal": "#dd6b20", "still": "#a0aec0", "anders": "#805ad5", "?": "#a0aec0"}
+    mfarbe = {"Holfuy": "#2f855a", "ICON-CH1": "#c53030", "ICON-CH2": "#6b46c1"}
     t0, t1 = jetzt_t - dt.timedelta(hours=stunden), jetzt_t + dt.timedelta(hours=stunden)
     w = [x for x in lehn if x["t"] >= t0 and x["mittel"] is not None]
     mod = _modell_lehn(stunden + 1, stunden + 1)
     plt.rcParams.update({"font.size": 7})
-    fig, (ap, ax) = plt.subplots(2, 1, figsize=(6.2, 5.4), dpi=250, sharex=True,
-                                 gridspec_kw={"height_ratios": [0.9, 3.2], "hspace": 0.02})
-    # Hintergrund: gemessene Phase je 2-min-Wert
+    fig = plt.figure(figsize=(6.2, 8.8), dpi=250)
+    go = fig.add_gridspec(2, 1, height_ratios=[0.8, 3.0], hspace=0.04, top=0.97, bottom=0.47)
+    gu = fig.add_gridspec(1, 2, wspace=0.32, top=0.37, bottom=0.07)
+    ap = fig.add_subplot(go[0])
+    ax = fig.add_subplot(go[1], sharex=ap)
+    pr = fig.add_subplot(gu[0], projection="polar")
+    pb = fig.add_subplot(gu[1])
+    # --- Zeitreihe
     for a, b in zip(w, w[1:] + [None]):
         b_t = b["t"] if b else a["t"] + dt.timedelta(minutes=2)
         ax.axvspan(a["t"], b_t, color=farbe[_lehn_klasse(a["richtung"], a["mittel"])], alpha=0.16, lw=0)
     ax.fill_between([x["t"] for x in w], [x["mittel"] for x in w], color="#38a169", alpha=0.25, lw=0)
-    ax.plot([x["t"] for x in w], [x["mittel"] for x in w], color="#2f855a", lw=1.4, label="Holfuy Lehn Mittel (2 min)")
-    ax.plot([x["t"] for x in w], [x["boee"] for x in w], color="#2f855a", lw=0.9, ls="--", label="Holfuy Böe")
-    stil = {"ICON-CH1": ("#c53030", "-"), "ICON-CH2": ("#6b46c1", "-")}
+    ax.plot([x["t"] for x in w], [x["mittel"] for x in w], color=mfarbe["Holfuy"], lw=1.4, label="Holfuy Lehn Mittel (2 min)")
+    ax.plot([x["t"] for x in w], [x["boee"] for x in w], color=mfarbe["Holfuy"], lw=0.9, ls="--", label="Holfuy Böe")
     for name, reihe in mod.items():
-        r = [x for x in reihe if t0 - dt.timedelta(hours=1) <= x[0] <= t1]
-        c, ls = stil[name]
-        ax.plot([x[0] for x in r], [x[2] for x in r], color=c, lw=1.1, ls=ls, marker="o", ms=2,
-                label=f"{name} Mittel (stündl.)")
-        ax.plot([x[0] for x in r], [x[3] for x in r], color=c, lw=0.6, ls=":", label=f"{name} Böe")
-    ax.axvline(jetzt_t, color="k", lw=0.8)
-    ax.text(jetzt_t, 0.99, " jetzt → Prognose", transform=ax.get_xaxis_transform(), va="top", fontsize=6.5,
-            fontweight="bold")
+        r = [x for x in reihe if t0 - dt.timedelta(hours=1) <= x["t"] <= t1]
+        c = mfarbe[name]
+        ax.fill_between([x["t"] for x in r], [x["q10"] for x in r], [x["q90"] for x in r], color=c, alpha=0.10, lw=0)
+        ax.plot([x["t"] for x in r], [x["mittel"] for x in r], color=c, lw=1.1, marker="o", ms=2,
+                label=f"{name} Mittel (Band 10–90 %, {r[0]['n'] if r else 0} Member)")
+        ax.plot([x["t"] for x in r], [x["boee"] for x in r], color=c, lw=0.6, ls=":", label=f"{name} Böe")
+    for a_ in (ax, ap):
+        a_.axvline(jetzt_t, color="k", lw=0.8)
+    ap.text(jetzt_t, 2.0, "  jetzt → Prognose", va="center", fontsize=6.5, fontweight="bold")
     ax.set_ylabel("km/h")
-    ax.set_ylim(0, max([12] + [x["boee"] or 0 for x in w] + [x[3] for r in mod.values() for x in r
-                                                         if t0 <= x[0] <= t1]) * 1.1)
+    ax.set_ylim(0, max([12] + [x["boee"] or 0 for x in w] + [x["boee"] or 0 for r in mod.values() for x in r
+                                                            if t0 <= x["t"] <= t1]) * 1.1)
     ax.grid(lw=0.3, alpha=0.6)
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.07), fontsize=5.8, ncol=3, frameon=False)
+    ax.set_ylim(0, ax.get_ylim()[1] * 1.25)
+    ax.legend(loc="upper left", fontsize=5.4, ncol=2, framealpha=0.85, borderaxespad=0.3)
     ax.set_xlim(t0, t1)
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H"))
     ax.xaxis.set_major_locator(mdates.HourLocator())
-    # Pfeilzeilen: gemessen (10-min-Vektormittel) und Modelle; Pfeil = wohin der Wind weht
+    # --- Pfeilzeilen (wohin der Wind weht)
     zeilen = [("Holfuy", 2.0)] + [(n, 1.0 - 0.9 * k) for k, n in enumerate(mod)]
     for name, y in zeilen:
         if name == "Holfuy":
@@ -490,28 +516,81 @@ def _grafik_lehn(lehn: list[dict], titel: str, jetzt_t: dt.datetime, stunden: in
                     pfeile.append((t + dt.timedelta(minutes=7.5), f["dir"], f["mittel"]))
                 t += dt.timedelta(minutes=15)
         else:
-            pfeile = [(x[0], x[1], x[2]) for x in mod[name] if t0 <= x[0] <= t1]
-        if pfeile:                                   # quiver mit angles="uv": Richtung bildschirmtreu
+            pfeile = [(x["t"], x["dir"], x["mittel"]) for x in mod[name] if t0 <= x["t"] <= t1]
+        if pfeile:
             zu = [math.radians(d + 180) for _, d, _ in pfeile]
             ap.quiver([mdates.date2num(t) for t, *_ in pfeile], [y] * len(pfeile),
                       [math.sin(z) for z in zu], [math.cos(z) for z in zu],
                       color=[farbe[_lehn_klasse(d, v)] for _, d, v in pfeile], angles="uv", pivot="middle",
-                      scale=50 if name == "Holfuy" else 38, width=0.0030 if name == "Holfuy" else 0.0042, headwidth=3.5, headlength=4, headaxislength=3.5)
+                      scale=50 if name == "Holfuy" else 38, width=0.0030 if name == "Holfuy" else 0.0042,
+                      headwidth=3.5, headlength=4, headaxislength=3.5)
         ap.text(-0.01, y, name, transform=ap.get_yaxis_transform(), ha="right", va="center", fontsize=6)
     ap.set_ylim(-0.5, 2.5)
     ap.set_yticks([])
-    ap.axvline(jetzt_t, color="k", lw=0.8)
+    plt.setp(ap.get_xticklabels(), visible=False)
     for sp in ("top", "right", "left"):
         ap.spines[sp].set_visible(False)
     ap.set_title(titel, fontsize=7.5, loc="left", fontweight="bold")
-    fig.text(0.99, -0.02, "Hintergrund/Pfeile: blau = Bergwind (N–ESE), orange = Talwind (SSW–WNW), grau = still "
-             "< 3 km/h · Pfeil zeigt, wohin der Wind weht · Modell = 10 m am Gitterpunkt Lehn (Open-Meteo)",
-             ha="right", fontsize=5, color="#4a5568")
+    # --- Radar: Richtung (woher, Norden oben, im Uhrzeigersinn) und Stärke
+    pr.set_theta_zero_location("N")
+    pr.set_theta_direction(-1)
+    h1 = [x for x in w if x["t"] > jetzt_t - dt.timedelta(hours=1)]
+    if h1:
+        pr.plot([math.radians(x["richtung"]) for x in h1], [x["mittel"] for x in h1], "-o", color=mfarbe["Holfuy"],
+                lw=0.9, ms=2.2, label="Holfuy letzte Stunde")
+        pr.plot([math.radians(h1[-1]["richtung"])], [h1[-1]["mittel"]], "o", ms=6, mfc="white",
+                mec=mfarbe["Holfuy"], mew=1.5)
+    for name, reihe in mod.items():
+        r = [x for x in reihe if jetzt_t - dt.timedelta(hours=1) <= x["t"] <= jetzt_t + dt.timedelta(hours=3)]
+        if not r:
+            continue
+        pr.plot([math.radians(x["dir"]) for x in r], [x["mittel"] for x in r], "-o", color=mfarbe[name], lw=0.9,
+                ms=2.5, label=f"{name} −1…+3 h")
+        for x in r:
+            pr.annotate(f"{x['t']:%H}", (math.radians(x["dir"]), x["mittel"]), fontsize=4.8, color=mfarbe[name],
+                        xytext=(2, 2), textcoords="offset points")
+    rmax = max([8] + [x["mittel"] for x in h1] + [x["mittel"] for r in mod.values() for x in r
+                                                 if abs((x["t"] - jetzt_t).total_seconds()) <= 4 * 3600])
+    pr.set_ylim(0, rmax * 1.1)
+    pr.set_xticks([math.radians(a) for a in range(0, 360, 45)], ["N", "NE", "E", "SE", "S", "SW", "W", "NW"])
+    pr.tick_params(labelsize=6, pad=0)
+    pr.set_rlabel_position(160)
+    for a_, c in ((75, farbe["Berg"]), (250, farbe["Tal"])):
+        pr.plot([math.radians(a_)] * 2, [0, rmax * 1.1], color=c, lw=0.7, ls="--")
+    pr.set_title("Woher und wie stark (km/h)\n--- 75° Bergwind · 250° Talwind", fontsize=6.5, pad=14)
+    pr.legend(loc="upper center", bbox_to_anchor=(0.5, -0.06), fontsize=5.6, frameon=False)
+    # --- Anteil der Member mit Tal-/Bergwind je Stunde (Prognose)
+    zukunft = {n: [x for x in r if jetzt_t - dt.timedelta(minutes=30) <= x["t"] <= t1] for n, r in mod.items()}
+    for k, (name, r) in enumerate(zukunft.items()):
+        if not r:
+            continue
+        xs = [mdates.date2num(x["t"]) + (k - 0.5) * 0.012 for x in r]
+        unten = [0.0] * len(r)
+        for kl in ("Tal", "still", "anders", "Berg"):
+            hoehe = [x[kl] * 100 for x in r]
+            pb.bar(xs, hoehe, bottom=unten, width=0.011, color=farbe[kl], alpha=1.0 if k else 0.65,
+                   edgecolor="white", lw=0.3)
+            unten = [u + h_ for u, h_ in zip(unten, hoehe)]
+    pb.set_ylim(0, 100)
+    pb.set_ylabel("% der Member")
+    pb.xaxis.set_major_formatter(mdates.DateFormatter("%H"))
+    pb.xaxis.set_major_locator(mdates.HourLocator(interval=1))
+    pb.tick_params(labelsize=6)
+    pb.set_title("Prognose: Anteil der Member mit Tal-/Bergwind\nje Stunde (heller = CH1, kräftig = CH2)",
+                 fontsize=6.5, pad=8)
+    from matplotlib.patches import Patch
+    pb.legend(handles=[Patch(color=farbe[k], label=l) for k, l in
+                       (("Tal", "Talwind"), ("still", "still < 3"), ("anders", "anders"), ("Berg", "Bergwind"))],
+              loc="upper center", bbox_to_anchor=(0.5, -0.1), fontsize=5.6, ncol=4, frameon=False)
+    fig.text(0.5, 0.005, "Blau = Bergwind (N–ESE), orange = Talwind (SSW–WNW), grau = still < 3 km/h · Pfeile oben: "
+             "wohin der Wind weht · Modelle: 10 m am Gitterpunkt Lehn, stündlich (Open-Meteo Ensemble)",
+             ha="center", fontsize=5, color="#4a5568")
     OUT.mkdir(exist_ok=True)
     f = OUT / "jetzt_lehn.png"
     fig.savefig(f, bbox_inches="tight")
     plt.close(fig)
     return f
+
 
 def jetzt(stationen: list[str], bis: str | None = None, grafik: bool = True) -> None:
     """Kurz-Briefing für unterwegs: Lehn jetzt (10/30 min), Trend, Berg-/Talwind und Nähe zum Kipppunkt,
