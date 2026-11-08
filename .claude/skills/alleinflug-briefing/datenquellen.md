@@ -29,8 +29,9 @@ MeteoSchweiz-App** von Benjamin.
   und wärmer = Inversion/Nebelobergrenze dazwischen.
 - Updates alle 15 min; Seite kann bis zu ~15 min hinterherhinken.
 - **Feinste Historie:** `holfuy.com/dynamic/graphs/tdarr<id>.js` (Referer = Stationsseite). Liefert
-  Mittel, Böe, Minimum, Richtung, T, rF und Druck in Lokalzeit, **für heute im 2-min-Takt**, für die
-  6 Vortage nur 15-min. Darum am Flugtag selbst `lagecheck.py archiv` laufen lassen (legt
+  Mittel, Böe, Minimum, Richtung, T, rF und Druck in Lokalzeit, **für heute und die 2 Vortage im
+  2-min-Takt** (am 08.11.2026 geprüft: 06./07.11. noch 2-min, 04./05.11. nur 15-min), ältere Tage
+  15-min. Darum spätestens am Folgetag `lagecheck.py archiv` laufen lassen (legt
   `holfuy-<id>_15min.json` an, heute in 2-min-Auflösung). `/puget/mjso.php?k=<id>` = nur Livewert.
 
 ## MeteoSchweiz SMN (offene Daten, 10 min)
