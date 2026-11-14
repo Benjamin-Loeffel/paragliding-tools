@@ -174,6 +174,8 @@ function draw(){
 const t0=Date.now();new ResizeObserver(()=>{map.updateSize();if(Date.now()-t0<2000&&draw.ext)map.getView().fit(draw.ext,{padding:[40,40,40,40],maxZoom:16})}).observe(document.getElementById("map"));
 function seg(id,key,cb){document.querySelectorAll(`#${id} button`).forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute("aria-pressed",String(x===b)));state[key]=b.dataset.k;cb();}))}
 seg("base","base",()=>Object.entries(bases).forEach(([k,l])=>l.setVisible(k===state.base)));
+// Kartengrund über die Adresse vorwählen: …_gleitkarte.html#topo, #lk, #img
+{const h=location.hash.slice(1);const b=document.querySelector(`#base button[data-k="${h}"]`);if(b)b.click();}
 seg("mode","mode",draw);seg("gzmode","gz",draw);
 const fl=document.getElementById("flights");
 FLIGHTS.forEach(f=>{
