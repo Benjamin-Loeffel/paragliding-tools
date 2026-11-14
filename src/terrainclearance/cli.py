@@ -70,6 +70,8 @@ def main(argv=None) -> int:
                     help="0..1: Dunkelheit der 3D-Schummerung (Default 0.5)")
     ap.add_argument("--surface3d-color", choices=["clearance", "p05", "mean"], default=None,
                     help="3D-Spur einfärben nach Schätzwert (clearance), MC-Untergrenze (p05) oder Mittel")
+    ap.add_argument("--no-glide", action="store_true",
+                    help="Keine Gleitzahlen (Geradeausstücke) im 3D-Plot einzeichnen")
     ap.add_argument("--no-uncertainty", action="store_true",
                     help="Kein Monte-Carlo-Unsicherheitsband (schneller)")
     ap.add_argument("--sigma-h", type=float, default=None, help="1σ horizontaler GPS-Fehler [m]")
@@ -108,6 +110,7 @@ def main(argv=None) -> int:
     if args.surface3d_color is not None:
         cfg.surface3d_color_by = args.surface3d_color
     cfg.export_png = args.png
+    cfg.surface3d_glide = not args.no_glide
 
     files = _resolve_inputs(args.inputs)
     if not files:

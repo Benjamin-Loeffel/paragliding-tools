@@ -17,6 +17,7 @@ from plotly.subplots import make_subplots
 from .calibrate import CalibrationResult
 from .config import Config
 from .critical import Event
+from .glide import glide_segments
 from .igc_loader import FlightTrack
 
 import logging
@@ -304,14 +305,61 @@ def build_terrain3d(track: FlightTrack, e, n, alt_cal, clr: ClearanceResult,
             hoverinfo="text", name="critical",
         ))
 
+    title = f"{track.name} — 3D relief & flight track"
+    if cfg.surface3d_glide:
+        gz = glide_segments(e, n, alt_cal, track.t_s, track.valid, min_s=cfg.glide_min_s)
+        _add_glide(fig, gz, e - e0, n - n0, alt_cal, times)
+        if gz.straight:
+            g = gz.straight
+            title += (f"<br><sup>Gleitzahl geradeaus {g['glide_ground']:.1f} über Grund · "
+                      f"{g['glide_air']:.1f} in der Luft · Sinken {g['sink_mps']:.2f} m/s · "
+                      f"Fahrt {g['airspeed_kmh']:.0f} km/h · ganzer Flugweg {gz.glide_track:.1f} · "
+                      f"Wind {gz.wind_kmh:.0f} km/h aus {gz.wind_from_deg:.0f}° (aus den Kurven)</sup>")
+
     fig.update_layout(
-        title=f"{track.name} — 3D relief & flight track",
+        title=title,
         scene=dict(xaxis_title="East [m]", yaxis_title="North [m]", zaxis_title="Altitude [m a.s.l.]",
                    aspectmode="data"),
         margin=dict(l=0, r=0, t=40, b=0),
         legend=dict(orientation="h", yanchor="bottom", y=0.0, x=0),
     )
     return fig
+
+
+_GLIDE_SCALE = "Viridis"          # bewusst anders als die Rot-Grün-Abstandsskala (wie Gleitlabor)
+_GLIDE_RANGE = (4.0, 10.0)
+
+
+def _add_glide(fig: go.Figure, gz, x, y, z, times) -> None:
+    """Geradeausstücke als dicke, nach Gleitzahl eingefärbte Linien + lesbare Beschriftung."""
+    if not gz.segments:
+        return
+    xs, ys, zs, col, txt = [], [], [], [], []
+    lx, ly, lz, lt = [], [], [], []
+    for s in gz.segments:
+        sl = slice(s.i0, s.i1 + 1)
+        hover = (f"Gleitstück {times[s.i0]:%H:%M:%S}–{times[s.i1]:%H:%M:%S} · {s.duration_s:.0f} s<br>"
+                 f"<b>GZ {s.glide_ground:.1f}</b> über Grund · {s.glide_air:.1f} in der Luft<br>"
+                 f"{s.length_m:.0f} m · Δh {s.loss_m:.0f} m · Sinken {s.sink_mps:.2f} m/s<br>"
+                 f"GS {s.gs_kmh:.0f} km/h · Fahrt {s.airspeed_kmh:.0f} km/h · Kurs {s.bearing_deg:.0f}°")
+        k = sl.stop - sl.start
+        xs += [*x[sl], None]; ys += [*y[sl], None]; zs += [*(z[sl] + 6.0), None]   # knapp über der Spur
+        col += [s.glide_ground] * (k + 1); txt += [hover] * (k + 1)
+        m = (s.i0 + s.i1) // 2
+        lx.append(x[m]); ly.append(y[m]); lz.append(z[m] + 30.0)
+        lt.append(f"GZ {s.glide_ground:.1f}" if abs(s.glide_ground - s.glide_air) < 0.4
+                  else f"GZ {s.glide_ground:.1f} (Luft {s.glide_air:.1f})")
+    fig.add_trace(go.Scatter3d(
+        x=xs, y=ys, z=zs, mode="lines", text=txt, hoverinfo="text",
+        line=dict(color=col, colorscale=_GLIDE_SCALE, cmin=_GLIDE_RANGE[0], cmax=_GLIDE_RANGE[1], width=12,
+                  colorbar=dict(title="Gleitzahl<br>(geradeaus)", x=1.12, len=0.6)),
+        name="Gleitzahl (Geradeausstücke ≥ 20 s)",
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=lx, y=ly, z=lz, mode="text", text=lt, hoverinfo="skip",
+        textfont=dict(size=15, color="#111111", family="Arial Black, Arial"),
+        name="Gleitzahl-Beschriftung",
+    ))
 
 
 def write_csv_points(path: Path, track: FlightTrack, alt_cal, clr: ClearanceResult, levels, unc=None) -> None:

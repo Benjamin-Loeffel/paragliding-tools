@@ -126,6 +126,10 @@ class Config:
     MC-Untergrenze) oder 'mean' (MC-Mittel). p05/mean brauchen aktiviertes MC."""
     surface3d_margin_m: float = 120.0
     """Rand um die Flugspur, der im 3D-Plot mitgezeigt wird."""
+    surface3d_glide: bool = True
+    """Gleitzahlen der Geradeausstücke im 3D-Plot einzeichnen (Farbe + Beschriftung)."""
+    glide_min_s: float = 20.0
+    """Mindestdauer eines Geradeausstücks für die Gleitzahl (s)."""
     timezone: str = "Europe/Zurich"
     """Zeitzone für die Barogramm-Achse ('UTC' für Rohzeit)."""
 

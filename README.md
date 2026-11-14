@@ -31,7 +31,9 @@ python analyze.py examples/data/igc/2026-06-25_66km.igc
 ```
 
 Produces interactive HTML that can be opened offline: map (track coloured by clearance), 3D relief
-with flight track, barogram with uncertainty band, clearance distribution.
+with flight track and **glide ratios** of the straight segments (≥ 20 s, colour + label, ground and
+wind-corrected; wind from the circles; `--no-glide` to switch off), barogram with uncertainty band,
+clearance distribution.
 **Example outputs:** [`examples/output/terrainclearance/`](examples/output/terrainclearance/)
 (interactive `…_map.html` + 3D/comparison PNGs + `risk_over_time.png`) · **Details & methodology:**
 [docs site → Terrain clearance](https://benjamin-loeffel.github.io/paragliding-tools/terrain-clearance/).
