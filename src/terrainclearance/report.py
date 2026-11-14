@@ -234,6 +234,40 @@ def _gray_scale(darkness: float):
             [1.0, f"rgb({lit},{lit},{max(lit - 7, 0)})"]]
 
 
+def _add_relief(fig: go.Figure, surf, surf_name: str, e, n, cfg: Config) -> tuple[float, float]:
+    """Relief (Schummerung oder Höhentönung) um die Spur(en) e/n; gibt den Ursprung (e0, n0) zurück."""
+    m = cfg.surface3d_margin_m
+    win = _grid_window(surf, e.min() - m, e.max() + m, n.min() - m, n.max() + m,
+                       cfg.surface3d_max_dim)
+    if win is None:
+        return float(e.min()), float(n.min())
+    sub, xs, ys = win
+    e0, n0 = float(xs.min()), float(ys.min())
+    xr = float(xs.max() - xs.min()) or 1.0
+    yr = float(ys.max() - ys.min()) or 1.0
+    zmax = float(np.nanmax(sub))
+    zr = zmax - float(np.nanmin(sub)) or 1.0
+    res_disp = float(xs[1] - xs[0]) if xs.size > 1 else surf.res
+    if cfg.surface3d_colorscale == "hillshade":
+        # Matt & dunkel: Relief steckt in der Schummerung (surfacecolor),
+        # Plotly-Licht flach + kein Specular => kein Glanz, alle Rinnen sichtbar.
+        fig.add_trace(go.Surface(
+            x=xs - e0, y=ys - n0, z=sub, surfacecolor=_hillshade(sub, res_disp),
+            cmin=0.0, cmax=1.0, colorscale=_gray_scale(cfg.surface3d_darkness),
+            showscale=False, opacity=1.0, name=surf_name, hoverinfo="skip",
+            lighting=dict(ambient=0.9, diffuse=0.12, specular=0.0, roughness=1.0, fresnel=0.0),
+        ))
+    else:
+        fig.add_trace(go.Surface(
+            x=xs - e0, y=ys - n0, z=sub,
+            colorscale=_TERRAIN_SCALES.get(cfg.surface3d_colorscale, _TERRAIN_SCALES["gray"]),
+            showscale=False, opacity=1.0, name=surf_name, hoverinfo="skip",
+            lighting=dict(ambient=0.38, diffuse=0.95, specular=0.12, roughness=0.85, fresnel=0.1),
+            lightposition=dict(x=-0.6 * xr, y=1.4 * yr, z=zmax + 2.5 * zr),
+        ))
+    return e0, n0
+
+
 def build_terrain3d(track: FlightTrack, e, n, alt_cal, clr: ClearanceResult,
                     events: list[Event], dtm, dsm, cfg: Config, unc=None) -> go.Figure:
     use_dsm = cfg.surface3d_model == "dsm" and dsm is not None
@@ -252,38 +286,8 @@ def build_terrain3d(track: FlightTrack, e, n, alt_cal, clr: ClearanceResult,
         tag = "p05 (conservative)" if cfg.surface3d_color_by == "p05" else "mean"
         clear_title = f"3D clearance {tag}<br>{suffix.strip()} [m]"
 
-    m = cfg.surface3d_margin_m
-    win = _grid_window(surf, e.min() - m, e.max() + m, n.min() - m, n.max() + m,
-                       cfg.surface3d_max_dim)
-
     fig = go.Figure()
-    if win is not None:
-        sub, xs, ys = win
-        e0, n0 = float(xs.min()), float(ys.min())
-        xr = float(xs.max() - xs.min()) or 1.0
-        yr = float(ys.max() - ys.min()) or 1.0
-        zmax = float(np.nanmax(sub))
-        zr = zmax - float(np.nanmin(sub)) or 1.0
-        res_disp = float(xs[1] - xs[0]) if xs.size > 1 else surf.res
-        if cfg.surface3d_colorscale == "hillshade":
-            # Matt & dunkel: Relief steckt in der Schummerung (surfacecolor),
-            # Plotly-Licht flach + kein Specular => kein Glanz, alle Rinnen sichtbar.
-            fig.add_trace(go.Surface(
-                x=xs - e0, y=ys - n0, z=sub, surfacecolor=_hillshade(sub, res_disp),
-                cmin=0.0, cmax=1.0, colorscale=_gray_scale(cfg.surface3d_darkness),
-                showscale=False, opacity=1.0, name=surf_name, hoverinfo="skip",
-                lighting=dict(ambient=0.9, diffuse=0.12, specular=0.0, roughness=1.0, fresnel=0.0),
-            ))
-        else:
-            fig.add_trace(go.Surface(
-                x=xs - e0, y=ys - n0, z=sub,
-                colorscale=_TERRAIN_SCALES.get(cfg.surface3d_colorscale, _TERRAIN_SCALES["gray"]),
-                showscale=False, opacity=1.0, name=surf_name, hoverinfo="skip",
-                lighting=dict(ambient=0.38, diffuse=0.95, specular=0.12, roughness=0.85, fresnel=0.1),
-                lightposition=dict(x=-0.6 * xr, y=1.4 * yr, z=zmax + 2.5 * zr),
-            ))
-    else:
-        e0, n0 = float(e.min()), float(n.min())
+    e0, n0 = _add_relief(fig, surf, surf_name, e, n, cfg)
 
     times = _local_times(track.dt, cfg.timezone)
     hover = [_hover(track, alt_cal, clr, i, times, unc) for i in range(track.n)]
@@ -330,7 +334,9 @@ _GLIDE_SCALE = "Viridis"          # bewusst anders als die Rot-Grün-Abstandsska
 _GLIDE_RANGE = (4.0, 10.0)
 
 
-def _add_glide(fig: go.Figure, gz, x, y, z, times) -> None:
+def _add_glide(fig: go.Figure, gz, x, y, z, times, prefix: str = "", group: str | None = None,
+               showscale: bool = True, name: str = "Gleitzahl (Geradeausstücke ≥ 20 s)",
+               label_min_s: float = 0.0) -> None:
     """Geradeausstücke als dicke, nach Gleitzahl eingefärbte Linien + lesbare Beschriftung."""
     if not gz.segments:
         return
@@ -338,28 +344,90 @@ def _add_glide(fig: go.Figure, gz, x, y, z, times) -> None:
     lx, ly, lz, lt = [], [], [], []
     for s in gz.segments:
         sl = slice(s.i0, s.i1 + 1)
-        hover = (f"Gleitstück {times[s.i0]:%H:%M:%S}–{times[s.i1]:%H:%M:%S} · {s.duration_s:.0f} s<br>"
+        hover = (f"{prefix}Gleitstück {times[s.i0]:%H:%M:%S}–{times[s.i1]:%H:%M:%S} · {s.duration_s:.0f} s<br>"
                  f"<b>GZ {s.glide_ground:.1f}</b> über Grund · {s.glide_air:.1f} in der Luft<br>"
                  f"{s.length_m:.0f} m · Δh {s.loss_m:.0f} m · Sinken {s.sink_mps:.2f} m/s<br>"
                  f"GS {s.gs_kmh:.0f} km/h · Fahrt {s.airspeed_kmh:.0f} km/h · Kurs {s.bearing_deg:.0f}°")
         k = sl.stop - sl.start
         xs += [*x[sl], None]; ys += [*y[sl], None]; zs += [*(z[sl] + 6.0), None]   # knapp über der Spur
         col += [s.glide_ground] * (k + 1); txt += [hover] * (k + 1)
+        if s.duration_s < label_min_s:      # kurze Stücke nur farbig + Hover (Übersicht)
+            continue
         m = (s.i0 + s.i1) // 2
         lx.append(x[m]); ly.append(y[m]); lz.append(z[m] + 30.0)
-        lt.append(f"GZ {s.glide_ground:.1f}" if abs(s.glide_ground - s.glide_air) < 0.4
-                  else f"GZ {s.glide_ground:.1f} (Luft {s.glide_air:.1f})")
+        lt.append(f"{prefix}GZ {s.glide_ground:.1f}" if abs(s.glide_ground - s.glide_air) < 0.4
+                  else f"{prefix}GZ {s.glide_ground:.1f} (Luft {s.glide_air:.1f})")
     fig.add_trace(go.Scatter3d(
         x=xs, y=ys, z=zs, mode="lines", text=txt, hoverinfo="text",
         line=dict(color=col, colorscale=_GLIDE_SCALE, cmin=_GLIDE_RANGE[0], cmax=_GLIDE_RANGE[1], width=12,
-                  colorbar=dict(title="Gleitzahl<br>(geradeaus)", x=1.12, len=0.6)),
-        name="Gleitzahl (Geradeausstücke ≥ 20 s)",
+                  showscale=showscale, colorbar=dict(title="Gleitzahl<br>(geradeaus)", x=1.12, len=0.6)),
+        name=name, legendgroup=group,
     ))
     fig.add_trace(go.Scatter3d(
         x=lx, y=ly, z=lz, mode="text", text=lt, hoverinfo="skip",
         textfont=dict(size=15, color="#111111", family="Arial Black, Arial"),
-        name="Gleitzahl-Beschriftung",
+        name="Gleitzahl-Beschriftung", legendgroup=group, showlegend=group is None,
     ))
+
+
+_FLIGHT_COLORS = ["#e41a1c", "#377eb8", "#ff7f00", "#984ea3", "#a65628", "#f781bf", "#17becf", "#4daf4a"]
+
+
+def build_terrain3d_multi(flights: list[dict], surf, surf_name: str, cfg: Config) -> go.Figure:
+    """Mehrere Flüge in einer 3D-Ansicht: gemeinsames Relief, Spur je Flug in eigener Farbe,
+    Gleitzahlen der Geradeausstücke (eine Farbskala), je Flug in der Legende ein-/ausblendbar.
+
+    ``flights``: dicts mit e, n, alt (kalibriert), t_s, valid, dt (UTC)."""
+    fig = go.Figure()
+    e_all = np.concatenate([f["e"] for f in flights])
+    n_all = np.concatenate([f["n"] for f in flights])
+    e0, n0 = _add_relief(fig, surf, surf_name, e_all, n_all, cfg)
+    zeilen = []
+    for k, f in enumerate(flights):
+        nr, grp = k + 1, f"flug{k + 1}"
+        col = _FLIGHT_COLORS[k % len(_FLIGHT_COLORS)]
+        times = _local_times(f["dt"], cfg.timezone)
+        x, y, z = f["e"] - e0, f["n"] - n0, f["alt"]
+        label = f"Flug {nr} · {times[0]:%H:%M}–{times[-1]:%H:%M}"
+        fig.add_trace(go.Scatter3d(
+            x=x, y=y, z=z, mode="lines", line=dict(color=col, width=4), legendgroup=grp, name=label,
+            text=[f"{label}<br>{t:%H:%M:%S} · {a:.0f} m" for t, a in zip(times, z)], hoverinfo="text",
+        ))
+        if cfg.surface3d_glide:
+            gz = glide_segments(f["e"], f["n"], f["alt"], f["t_s"], f["valid"], min_s=cfg.glide_min_s)
+            _add_glide(fig, gz, x, y, z, times, prefix=f"{nr}: ", group=grp, showscale=k == 0,
+                       name=f"Flug {nr}: Gleitzahlen", label_min_s=40.0)
+            if gz.straight:
+                g = gz.straight
+                zeilen.append(f"Flug {nr}: geradeaus {g['glide_ground']:.1f} (Luft {g['glide_air']:.1f}) · "
+                              f"ganzer Flugweg {gz.glide_track:.1f} · Sinken {g['sink_mps']:.2f} m/s · "
+                              f"Wind {gz.wind_kmh:.0f} km/h aus {gz.wind_from_deg:.0f}°")
+    # Startplätze: nahe beieinander liegende Starts (< 200 m) zu einer Beschriftung zusammenfassen
+    starts: list[list] = []
+    for k, f in enumerate(flights):
+        p = (f["e"][0] - e0, f["n"][0] - n0, float(f["alt"][0]))
+        for g in starts:
+            if np.hypot(g[0][0] - p[0], g[0][1] - p[1]) < 200.0:
+                g[1].append(k + 1)
+                break
+        else:
+            starts.append([p, [k + 1]])
+    fig.add_trace(go.Scatter3d(
+        x=[g[0][0] for g in starts], y=[g[0][1] for g in starts], z=[g[0][2] + 40.0 for g in starts],
+        mode="text", text=["Start " + ", ".join(map(str, g[1])) for g in starts], hoverinfo="skip",
+        textfont=dict(size=14, color="#b30000", family="Arial Black, Arial"), name="Start",
+    ))
+    title = f"{len(flights)} Flüge — 3D-Relief, Spuren und Gleitzahlen (Beschriftung ab 40 s, Rest per Hover)"
+    if zeilen:
+        title += "<br><sup>" + "<br>".join(zeilen) + "</sup>"
+    fig.update_layout(
+        title=dict(text=title, y=0.98),
+        scene=dict(xaxis_title="East [m]", yaxis_title="North [m]", zaxis_title="Altitude [m a.s.l.]",
+                   aspectmode="data", camera=dict(eye=dict(x=0.5, y=-2.3, z=1.7))),
+        margin=dict(l=0, r=0, t=40 + 16 * len(zeilen), b=0),
+        legend=dict(orientation="h", yanchor="bottom", y=0.0, x=0),
+    )
+    return fig
 
 
 def write_csv_points(path: Path, track: FlightTrack, alt_cal, clr: ClearanceResult, levels, unc=None) -> None:

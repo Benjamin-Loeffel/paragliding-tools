@@ -13,8 +13,8 @@ import requests
 from .config import Config
 from .distribution import build_aggregate_kde, build_risk_over_time
 from .geo import CoordTransformer
-from .pipeline import analyze_flight
-from .report import save_png
+from .pipeline import analyze_flight, combined_surface
+from .report import build_terrain3d_multi, save_png
 
 
 def _resolve_inputs(inputs: list[str]) -> list[Path]:
@@ -70,6 +70,8 @@ def main(argv=None) -> int:
                     help="0..1: Dunkelheit der 3D-Schummerung (Default 0.5)")
     ap.add_argument("--surface3d-color", choices=["clearance", "p05", "mean"], default=None,
                     help="3D-Spur einfärben nach Schätzwert (clearance), MC-Untergrenze (p05) oder Mittel")
+    ap.add_argument("--no-combined-3d", action="store_true",
+                    help="Bei mehreren Flügen keine gemeinsame 3D-Ansicht (alle_fluege_3d.html)")
     ap.add_argument("--no-glide", action="store_true",
                     help="Keine Gleitzahlen (Geradeausstücke) im 3D-Plot einzeichnen")
     ap.add_argument("--no-uncertainty", action="store_true",
@@ -129,6 +131,17 @@ def main(argv=None) -> int:
             _print_summary(s)
         except Exception as exc:  # pragma: no cover
             logging.exception("Fehler bei %s: %s", f.name, exc)
+
+    # Gemeinsame 3D-Ansicht aller Flüge (Relief über das ganze Gebiet)
+    flights3d = [s["track3d"] for s in summaries if s.get("track3d") is not None]
+    if cfg.surface3d and len(flights3d) >= 2 and not args.no_combined_3d:
+        surf, surf_name = combined_surface(flights3d, cfg, session)
+        multi = build_terrain3d_multi(flights3d, surf, surf_name, cfg)
+        multi_path = cfg.output_dir / "alle_fluege_3d.html"
+        multi.write_html(str(multi_path), include_plotlyjs=True)
+        if cfg.export_png:
+            save_png(multi, cfg.output_dir / "alle_fluege_3d.png", 1500, 1000)
+        print(f"\n══ 3D-Ansicht aller {len(flights3d)} Flüge → {multi_path}")
 
     # Mehrflug-Zusammenzug der Hangabstand-Verteilung
     dists = [s["dist_terrain"] for s in summaries if s.get("dist_terrain") is not None]

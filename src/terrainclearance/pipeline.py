@@ -113,4 +113,23 @@ def analyze_flight(path: str | Path, cfg: Config, session: requests.Session,
         "paths": {k: str(v) for k, v in paths.items()},
         "events": events,
         "dist_terrain": dist_terrain,
+        # für die gemeinsame 3D-Ansicht mehrerer Flüge (cli)
+        "track3d": dict(e=e, n=n, alt=alt_cal, t_s=track.t_s, valid=track.valid, dt=track.dt,
+                        bbox=track.bbox_wgs84()),
     }
+
+
+def combined_surface(flights: list[dict], cfg: Config, session: requests.Session):
+    """Oberfläche (DSM, sonst DTM) über die Vereinigung aller Flug-BBoxen (Kacheln aus dem Cache)."""
+    bb = [f["bbox"] for f in flights]
+    bbox = _expand_bbox((min(b[0] for b in bb), min(b[1] for b in bb),
+                         max(b[2] for b in bb), max(b[3] for b in bb)), cfg.surface3d_margin_m)
+    if cfg.surface3d_model == "dsm":
+        tiles = find_tiles(cfg, bbox, "dsm", session)
+        if tiles:
+            paths = download_tiles(tiles, cfg.cache_dir / "dsm", session)
+            return (build_mosaic(paths, cfg.max_mosaic_cells),
+                    "Surface (swissSURFACE3D, incl. forest/buildings)")
+    tiles = find_tiles(cfg, bbox, "dtm", session)
+    paths = download_tiles(tiles, cfg.cache_dir / "dtm", session)
+    return build_mosaic(paths, cfg.max_mosaic_cells), "Terrain (swissALTI3D)"
