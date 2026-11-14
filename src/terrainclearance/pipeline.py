@@ -114,8 +114,8 @@ def analyze_flight(path: str | Path, cfg: Config, session: requests.Session,
         "events": events,
         "dist_terrain": dist_terrain,
         # für die gemeinsame 3D-Ansicht mehrerer Flüge (cli)
-        "track3d": dict(e=e, n=n, alt=alt_cal, t_s=track.t_s, valid=track.valid, dt=track.dt,
-                        bbox=track.bbox_wgs84()),
+        "track3d": dict(name=track.name, e=e, n=n, lat=track.lat, lon=track.lon, alt=alt_cal,
+                        t_s=track.t_s, valid=track.valid, dt=track.dt, bbox=track.bbox_wgs84()),
     }
 
 

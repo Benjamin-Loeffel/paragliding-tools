@@ -130,6 +130,8 @@ class Config:
     """Gleitzahlen der Geradeausstücke im 3D-Plot einzeichnen (Farbe + Beschriftung)."""
     glide_min_s: float = 20.0
     """Mindestdauer eines Geradeausstücks für die Gleitzahl (s)."""
+    glide_map: bool = True
+    """2D-Gleitkarte (OpenLayers wie Flightbook) je Flug und für alle Flüge zusammen schreiben."""
     timezone: str = "Europe/Zurich"
     """Zeitzone für die Barogramm-Achse ('UTC' für Rohzeit)."""
 

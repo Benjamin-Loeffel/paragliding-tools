@@ -14,7 +14,8 @@ from .config import Config
 from .distribution import build_aggregate_kde, build_risk_over_time
 from .geo import CoordTransformer
 from .pipeline import analyze_flight, combined_surface
-from .report import build_terrain3d_multi, save_png
+from .glide_map import build_glide_map_html, flight_payload
+from .report import _local_times, build_terrain3d_multi, save_png
 
 
 def _resolve_inputs(inputs: list[str]) -> list[Path]:
@@ -72,6 +73,8 @@ def main(argv=None) -> int:
                     help="3D-Spur einfärben nach Schätzwert (clearance), MC-Untergrenze (p05) oder Mittel")
     ap.add_argument("--no-combined-3d", action="store_true",
                     help="Bei mehreren Flügen keine gemeinsame 3D-Ansicht (alle_fluege_3d.html)")
+    ap.add_argument("--no-glide-map", action="store_true",
+                    help="Keine 2D-Gleitkarte (…_gleitkarte.html, gleitkarte_alle.html) schreiben")
     ap.add_argument("--no-glide", action="store_true",
                     help="Keine Gleitzahlen (Geradeausstücke) im 3D-Plot einzeichnen")
     ap.add_argument("--no-uncertainty", action="store_true",
@@ -113,6 +116,7 @@ def main(argv=None) -> int:
         cfg.surface3d_color_by = args.surface3d_color
     cfg.export_png = args.png
     cfg.surface3d_glide = not args.no_glide
+    cfg.glide_map = not args.no_glide_map
 
     files = _resolve_inputs(args.inputs)
     if not files:
@@ -134,6 +138,19 @@ def main(argv=None) -> int:
 
     # Gemeinsame 3D-Ansicht aller Flüge (Relief über das ganze Gebiet)
     flights3d = [s["track3d"] for s in summaries if s.get("track3d") is not None]
+
+    # 2D-Gleitkarte (OpenLayers wie Flightbook): je Flug und alle zusammen
+    if cfg.glide_map and flights3d:
+        payloads = [flight_payload(f, _local_times(f["dt"], cfg.timezone), k + 1, cfg.glide_min_s)
+                    for k, f in enumerate(flights3d)]
+        for f, p in zip(flights3d, payloads):
+            einzel = dict(p, nr=1)
+            path = cfg.flight_dir(f["name"]) / f"{f['name']}_gleitkarte.html"
+            path.write_text(build_glide_map_html([einzel], f"Gleitkarte {f['name']}"), encoding="utf-8")
+        if len(payloads) >= 2:
+            alle = cfg.output_dir / "gleitkarte_alle.html"
+            alle.write_text(build_glide_map_html(payloads, f"Gleitkarte – {len(payloads)} Flüge"), encoding="utf-8")
+            print(f"\n══ 2D-Gleitkarte aller {len(payloads)} Flüge → {alle}")
     if cfg.surface3d and len(flights3d) >= 2 and not args.no_combined_3d:
         surf, surf_name = combined_surface(flights3d, cfg, session)
         multi = build_terrain3d_multi(flights3d, surf, surf_name, cfg)

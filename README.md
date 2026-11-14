@@ -34,7 +34,9 @@ Produces interactive HTML that can be opened offline: map (track coloured by cle
 with flight track and **glide ratios** of the straight segments (≥ 20 s, colour + label, ground and
 wind-corrected; wind from the circles; `--no-glide` to switch off), barogram with uncertainty band,
 clearance distribution. With several flights also `alle_fluege_3d.html`: one relief for the whole
-area, all tracks, glide ratios per flight (`--no-combined-3d` to switch off).
+area, all tracks, glide ratios per flight (`--no-combined-3d` to switch off). Plus a 2D **glide map**
+(`…_gleitkarte.html`, `gleitkarte_alle.html`): OpenLayers like Flightbook, basemap OpenStreetMap /
+OpenTopoMap / swisstopo, track coloured by vario, glide segments labelled (`--no-glide-map`).
 **Example outputs:** [`examples/output/terrainclearance/`](examples/output/terrainclearance/)
 (interactive `…_map.html` + 3D/comparison PNGs + `risk_over_time.png`) · **Details & methodology:**
 [docs site → Terrain clearance](https://benjamin-loeffel.github.io/paragliding-tools/terrain-clearance/).
